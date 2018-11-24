@@ -20,6 +20,23 @@ def discretizeSpace(space, grain):
             discSpace[i][j] = lows[i] + j * step
     return discSpace
 
+def exploration_policy(obs):
+    return [rnd.gauss(0,1)]
+
+def explore(env, numSamples):
+    samples = []
+    while len(samples) < numSamples:
+        done = False
+        obs = env.reset()
+        while not done:
+            s = [obs]
+            a = exploration_policy(obs)
+            s.append(a)
+            obs, r, done, info = env.step(a)
+            s.append(r)
+            s.append(obs)
+            samples.append(s)
+    return samples
 
 def main():
     # false for pendulum, true for qube
@@ -29,6 +46,9 @@ def main():
     discStates = discretizeSpace(env.observation_space, 10)
     print(discActions)
     print(discStates)
+    samples = explore(env, 10000)
+    print(len(samples))
+    print(samples[0])
 
 # discretize state and action spaces
 # gather data for regression using exploration policy
