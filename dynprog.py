@@ -97,4 +97,6 @@ def main():
     print(len(samples))
     print(samples[0])
 
+# For automatic execution
+main()
 
