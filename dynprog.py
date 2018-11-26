@@ -2,15 +2,17 @@ import gym
 import quanser_robots
 import numpy as np
 import random as rnd
+import matplotlib.pyplot as plt
 
 # dynamic programming algorithm
 # steps:
 # discretize state and action spaces (TODO: try better discretizations)
 # gather data for regression using exploration policy (TODO: try better exploration policies)
-# TODO: learn dynamics function
-# TODO: learn reward function
+# learn dynamics function
+# learn reward function
 # TODO: policy iteration / value iteration
 # TODO: plot results
+
 
 
 # returns a gym environment depending on the boolean input
@@ -56,7 +58,7 @@ def discretize(sample, space):
                 else:
                     discSample.append(prev)
                 break
-    return discSample
+    return np.array(discSample)
 
 # gaussian exploration policy (for pendulum only)
 # obs - current state
@@ -83,20 +85,119 @@ def explore(env, numSamples, dA, dS):
             s.append(r)
             s.append(obs)
             samples.append(s)
-    return samples
+    return np.array(samples)
+
+# generates an array of random phase shifts for fourier features
+def getphi(I):
+    phi = []
+    for i in range(I):
+        phi.append(rnd.random() * 2 * np.pi - np.pi)
+    return np.array(phi)
+
+# generates a matrix of random weights for fourier features
+def getP(I,J):
+    P = []
+    for i in range(I):
+        Pi = []
+        for j in range(J):
+            Pi.append(rnd.gauss(0,1))
+        P.append(Pi)
+    return np.array(P)
+
+# computes the fourier features for a state observation
+# args:
+# o - state observation
+# P - weight matrix
+# v - wavelength
+# phi - phase shifts
+# numfeat - number of fourier features to be generated
+def fourier(o, P, v, phi, numfeat):
+    y = []
+    for i in range(numfeat):
+        arg = 0
+        for j in range(len(o)):
+            arg += P[i][j] * o[j]
+        arg /= v
+        arg += phi[i]
+        y.append(np.sin(arg))
+    return np.array(y)
+
+# computes the feature matrix for fourier regression
+def featuremat(samples, numfeat, fourierparams):
+    numobs = len(samples[0][0])
+    numact = len(samples[0][1])
+    numsamp = len(samples)
+    P = fourierparams[0]
+    v = fourierparams[1]
+    phi = fourierparams[2]
+    mat = np.ones([numsamp,numfeat])
+    for i in range(numsamp):
+        curr_samp = samples[i]
+        x = np.append(curr_samp[0], curr_samp[1])
+        mat[i] = fourier(x, P, v, phi, numfeat)
+
+    return mat
+
+# executes fourier regression for the given samples
+# theta[0] contains the parameters for the reward function
+# theta[1] contains the parameters for the dynamics function
+def regression(samples, fourierparams):
+    theta = []
+    numfeat = fourierparams[3]
+    features = featuremat(samples, numfeat, fourierparams)
+    #print(features)
+    feat_inverse = np.linalg.pinv(features)
+    #print(feat_inverse)
+    rewards = samples[...,2]
+    #print(rewards)
+    next_states = np.array(samples[...,3])
+    #print(next_states)
+    theta_r = np.dot(feat_inverse,rewards)
+    #print(theta_r.shape)
+    #print(theta_r)
+    theta.append(theta_r)
+    theta_dyn = np.dot(feat_inverse,next_states)
+    #print(theta_dyn.shape)
+    #print(theta_dyn)
+    theta.append(theta_dyn)
+
+    return np.array(theta)
 
 def main():
     # false for pendulum, true for qube
     qube = False
     env = makeEnv(qube)
-    discActions = discretizeSpace(env.action_space, 10)
-    discStates = discretizeSpace(env.observation_space, 10)
-    print(discActions)
-    print(discStates)
+    discActions = discretizeSpace(env.action_space, 100)
+    discStates = discretizeSpace(env.observation_space, 100)
+    #print(discActions)
+    #print(discStates)
     samples = explore(env, 10000, discActions, discStates)
-    print(len(samples))
-    print(samples[0])
+    #print(len(samples))
+    #print(samples[0])
+    numobs = len(samples[0][0])
+    numact = len(samples[0][1])
+    numfeat = 100
+    P = getP(numfeat,numobs+numact)
+    v = 10
+    phi = getphi(numfeat)
+    fourierparams = [P, v, phi, numfeat]
 
+    theta = regression(samples, fourierparams)
+
+    # for visualizing the regression
+    x = np.ones([4,len(samples)])
+    yp = np.ones([len(samples)])
+    for i in range(len(samples)):
+        x[0][i] =  samples[i][0][0]
+        x[1][i] =  samples[i][0][1]
+        x[2][i] =  samples[i][0][2]
+        x[3][i] =  samples[i][1][0]
+        yp[i] = np.dot(theta[0], fourier(x[...,i], P, v, phi, numfeat))
+
+    #plt.scatter(x[0], np.abs(samples[...,2] - yp))
+    #plt.scatter(x[0], yp)
+    #plt.scatter(x[0], samples[...,2] )
+    #plt.show()
 # For automatic execution
 main()
 
