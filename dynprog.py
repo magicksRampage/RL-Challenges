@@ -182,24 +182,31 @@ def getNextState(obs, act, theta, fparams, discStates):
 
 # !!! WIP -- DO NOT USE !!!
 # Planes the optimal policy for a MDP defined by:
-# states:   3x101 array containing cos(th), sin(th), dot(th)
-# action:   3x101 array containing the torque
-# rewardAp:
-# transAp:
-def train_policy(states, actions, rewardAp, transAp):
+# states:   3xNo(DiscSteps) array containing cos(th), sin(th), dot(th)
+# action:   1xNo(DiscSteps) array containing the torque
+# theta:    1xNo(Features) array containing the coefficients for the fourier-approximation
+# fparams:  parameters for evaluation of fourier approximation
+def train_policy(states, actions, theta, fparams):
     # Setup value-function
-    valfun = np.zeros(len(states))
+    # length = No(all possible states)
+    NoStates = states.shape[1]
+    valfun = np.zeros(np.power(NoStates,3))
 
-    # Setup policy lookup-table
-    policy = np.zeros(states.shape)
+    # Contains amount of torque
+    # if t == np.inf torque is random
+    policy = np.full(len(valfun), np.inf)
 
     # iterate
-    oldPolicy = np.zeros(states.shape)
+    OldPolicy = np.full(len(valfun), np.inf)
     k = 0
     while (np.linalg.norm((policy-oldPolicy), np.inf) > 0.001) & k < 1000:
         oldPolicy = policy
 
         # policy evaluation
+        imReward = np.zeroes(len(valfun))
+        for i in range(len(imReward)):
+            # TODO sanitize policy input
+            imReward[i] = getReward((states[0][0], states[0][0], states[0][0] ) , policy[i], theta, fparams)
         # valfun = policy_evaluation()
 
         # greedy policy improvement
@@ -213,7 +220,7 @@ def main():
     qube = False
     env = makeEnv(qube)
     discActions = discretizeSpace(env.action_space, 100)
-    discStates = discretizeSpace(env.observation_space, 100)
+    discStates = discretizeSpace(env.observation_space, 10)
     #print(discActions)
     #print(discStates)
     samples = explore(env, 10000, discActions, discStates)
@@ -243,7 +250,7 @@ def main():
     print(test1)
     print(test2)
     # Planning via dynamic programming
-    #policy = train_policy(discStates, discActions, fourierparams, fourierparams)
+    #policy = train_policy(discStates, discActions, theta, fourierparams)
 
     # plt.scatter(x[0], np.abs(samples[...,2] - yp))
     # plt.scatter(x[0], yp)
