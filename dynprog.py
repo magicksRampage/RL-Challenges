@@ -150,8 +150,8 @@ def regression(samples, fourierparams):
     #print(feat_inverse)
     rewards = samples[...,2]
     #print(rewards)
-    next_states = np.array(samples[...,3])
-    #print(next_states)
+    next_states = np.array(list(samples[...,3]))
+    #print(next_states.shape)
     theta_r = np.dot(feat_inverse,rewards)
     #print(theta_r.shape)
     #print(theta_r)
@@ -160,8 +160,8 @@ def regression(samples, fourierparams):
     #print(theta_dyn.shape)
     #print(theta_dyn)
     theta.append(theta_dyn)
-
-    return np.array(theta)
+    #print(theta)
+    return theta
 
 def getReward(obs, act, theta, fparams):
     x = np.append(obs,act)
@@ -172,7 +172,7 @@ def getNextState(obs, act, theta, fparams, discStates):
     x = np.append(obs,act)
     fx = fourier(x, fparams[0], fparams[1], fparams[2], fparams[3])
     theta_s = theta[1]
-    print(theta_s[0])
+    #print(theta_s[...,0])
     newState = []
     for i in range(len(obs)):
         newState.append(np.dot(theta_s[...,i], fx))
