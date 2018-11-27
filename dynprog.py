@@ -163,6 +163,34 @@ def regression(samples, fourierparams):
 
     return np.array(theta)
 
+# !!! WIP -- DO NOT USE !!!
+# Planes the optimal policy for a MDP defined by:
+# states:   3x101 array containing cos(th), sin(th), dot(th)
+# action:   3x101 array containing the torque
+# rewardAp:
+# transAp:
+def train_policy(states, actions, rewardAp, transAp):
+    # Setup value-function
+    valfun = np.zeros(len(states))
+
+    # Setup policy lookup-table
+    policy = np.zeros(states.shape)
+
+    # iterate
+    oldPolicy = np.zeros(states.shape)
+    k = 0
+    while (np.linalg.norm((policy-oldPolicy), np.inf) > 0.001) & k < 1000:
+        oldPolicy = policy
+
+        # policy evaluation
+        # valfun = policy_evaluation()
+
+        # greedy policy improvement
+        # policy = policy_greedy_update()
+
+    # return optimal policy lookup-table
+    return policy
+
 def main():
     # false for pendulum, true for qube
     qube = False
@@ -188,16 +216,20 @@ def main():
     x = np.ones([4,len(samples)])
     yp = np.ones([len(samples)])
     for i in range(len(samples)):
-        x[0][i] =  samples[i][0][0]
-        x[1][i] =  samples[i][0][1]
-        x[2][i] =  samples[i][0][2]
-        x[3][i] =  samples[i][1][0]
+        x[0][i] = samples[i][0][0]
+        x[1][i] = samples[i][0][1]
+        x[2][i] = samples[i][0][2]
+        x[3][i] = samples[i][1][0]
         yp[i] = np.dot(theta[0], fourier(x[...,i], P, v, phi, numfeat))
 
-    #plt.scatter(x[0], np.abs(samples[...,2] - yp))
-    #plt.scatter(x[0], yp)
-    #plt.scatter(x[0], samples[...,2] )
-    #plt.show()
+    # Planning via dynamic programming
+    #policy = train_policy(discStates, discActions, fourierparams, fourierparams)
+
+    # plt.scatter(x[0], np.abs(samples[...,2] - yp))
+    # plt.scatter(x[0], yp)
+    # plt.scatter(x[0], samples[...,2] )
+    # plt.show()
+
+
 # For automatic execution
 main()
-
