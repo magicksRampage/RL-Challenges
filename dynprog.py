@@ -163,6 +163,23 @@ def regression(samples, fourierparams):
 
     return np.array(theta)
 
+def getReward(obs, act, theta, fparams):
+    x = np.append(obs,act)
+    fx = fourier(x, fparams[0], fparams[1], fparams[2], fparams[3])
+    return np.dot(theta[0], fx)
+
+def getNextState(obs, act, theta, fparams, discStates):
+    x = np.append(obs,act)
+    fx = fourier(x, fparams[0], fparams[1], fparams[2], fparams[3])
+    theta_s = theta[1]
+    print(theta_s[0])
+    newState = []
+    for i in range(len(obs)):
+        newState.append(np.dot(theta_s[...,i], fx))
+    #print(newState)
+    return discretize(np.array(newState), discStates)
+
+
 # !!! WIP -- DO NOT USE !!!
 # Planes the optimal policy for a MDP defined by:
 # states:   3x101 array containing cos(th), sin(th), dot(th)
@@ -204,7 +221,7 @@ def main():
     #print(samples[0])
     numobs = len(samples[0][0])
     numact = len(samples[0][1])
-    numfeat = 100
+    numfeat = 20
     P = getP(numfeat,numobs+numact)
     v = 10
     phi = getphi(numfeat)
@@ -221,7 +238,10 @@ def main():
         x[2][i] = samples[i][0][2]
         x[3][i] = samples[i][1][0]
         yp[i] = np.dot(theta[0], fourier(x[...,i], P, v, phi, numfeat))
-
+    test1 = getReward(samples[0][0], samples[0][1], theta, fourierparams)
+    test2 = getNextState(samples[0][0], samples[0][1], theta, fourierparams, discStates)
+    print(test1)
+    print(test2)
     # Planning via dynamic programming
     #policy = train_policy(discStates, discActions, fourierparams, fourierparams)
 
