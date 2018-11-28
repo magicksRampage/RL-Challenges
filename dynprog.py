@@ -45,7 +45,7 @@ def discretizeSpace(space, grain):
 def discretize(sample, space):
     discSample = []
     for i in range(len(sample)):
-        entry = sample[i]
+        entry = np.clip(sample[i], space[i][0], space[i][-1])
         for j in range(len(space[i])):
             step = space[i][j]
             if entry == step:
@@ -217,9 +217,7 @@ def train_policy(states, actions, theta, fparams):
                         imReward[i][j][k] = 0
                         for act in range(len(actions[0])):
                             imReward[i][j][k] += getReward((states[0][i], states[1][j], states[2][k]), actions[0][act], theta, fparams)/len(actions[0])
-                        transFun[i][j][k][0] = getNextState((states[0][i], states[1][j], states[2][k]), np.random.choice(actions[0]), theta, fparams, states)[0]
-                        transFun[i][j][k][1] = getNextState((states[0][i], states[1][j], states[2][k]), np.random.choice(actions[0]), theta, fparams, states)[1]
-                        transFun[i][j][k][2] = getNextState((states[0][i], states[1][j], states[2][k]), np.random.choice(actions[0]), theta, fparams, states)[2]
+                        transFun[i][j][k] = getNextState((states[0][i], states[1][j], states[2][k]), np.random.choice(actions[0]), theta, fparams, states)
 
                     else:
                         imReward[i][j][k] = getReward((states[0][i], states[1][j], states[2][k]), policy[i][j][k], theta, fparams)
