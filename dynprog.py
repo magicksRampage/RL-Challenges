@@ -205,32 +205,49 @@ def train_policy(states, actions, theta, fparams):
     transFun = np.zeros((valFun.shape + (3,)))
     imReward = np.zeros(valFun.shape)
 
-    while updates < 1000:
+    while updates < 10:
         oldPolicy = policy
         # policy evaluation
         for i in range(valFun.shape[0]):
             for j in range(valFun.shape[1]):
                 for k in range(valFun.shape[2]):
+                    if j > 5:
+                        print(i, j, k)
                     if np.isinf(policy[i][j][k]):
                         imReward[i][j][k] = 0
                         for act in range(len(actions[0])):
                             imReward[i][j][k] += getReward((states[0][i], states[1][j], states[2][k]), actions[0][act], theta, fparams)/len(actions[0])
-                        transFun[i][j][k] = getNextState((states[0][i], states[1][j], states[2][k]), np.random.choice(actions[0]), theta, fparams, states)
+                        transFun[i][j][k][0] = getNextState((states[0][i], states[1][j], states[2][k]), np.random.choice(actions[0]), theta, fparams, states)[0]
+                        transFun[i][j][k][1] = getNextState((states[0][i], states[1][j], states[2][k]), np.random.choice(actions[0]), theta, fparams, states)[1]
+                        transFun[i][j][k][2] = getNextState((states[0][i], states[1][j], states[2][k]), np.random.choice(actions[0]), theta, fparams, states)[2]
 
                     else:
                         imReward[i][j][k] = getReward((states[0][i], states[1][j], states[2][k]), policy[i][j][k], theta, fparams)
                         transFun[i][j][k] = getNextState((states[0][i], states[1][j], states[2][k]), policy[i][j][k], theta, fparams, states)
 
-                    # tempValFun = imReward[i][j][k] + gamma*valFun[transFun[i][j][k][0], transFun[i][j][k][1], transFun[i][j][k][2]]
+                    tempValFun[i][j][k] = imReward[i][j][k] + gamma*valFun[read_index_for_state(states, 0, transFun[i][j][k][0])][read_index_for_state(states, 1, transFun[i][j][k][1])][read_index_for_state(states, 2, transFun[i][j][k][2])]
         valFun = tempValFun
         # valFun = policy_evaluation()
 
         # greedy policy improvement
         # policy = policy_greedy_update()
-        updates += 1;
+        updates += 1
 
     # return optimal policy lookup-table
     return policy
+
+
+# Finds the index of a given stateValue in its discretized Space
+# states:       discretized state space
+# dimension:    state dimension in which the value is to be found
+# stateVal:     the Value for which to find the index
+def read_index_for_state(states, dimension, stateVal):
+    dimLen = len(states[dimension])
+    dimMax = states[dimension][dimLen-1]
+    dimMin = states[dimension][0]
+    step = (dimMax - dimMin)/(dimLen-1)
+    index = (stateVal - dimMin) / step
+    return int(round(index))
 
 def main():
     # false for pendulum, true for qube
