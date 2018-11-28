@@ -189,28 +189,45 @@ def getNextState(obs, act, theta, fparams, discStates):
 def train_policy(states, actions, theta, fparams):
     # Setup value-function
     # length = No(all possible states)
-    NoStates = states.shape[1]
-    valfun = np.zeros(np.power(NoStates,3))
+    state_dim_len = states.shape[1]
+    valFun = np.zeros((state_dim_len, state_dim_len, state_dim_len))
 
     # Contains amount of torque
     # if t == np.inf torque is random
-    policy = np.full(len(valfun), np.inf)
+    policy = np.full(valFun.shape, np.inf)
 
     # iterate
-    OldPolicy = np.full(len(valfun), np.inf)
-    k = 0
-    while (np.linalg.norm((policy-oldPolicy), np.inf) > 0.001) & k < 1000:
-        oldPolicy = policy
+    oldPolicy = np.full(valFun.shape, np.inf)
+    tempValFun = np.zeros((state_dim_len, state_dim_len, state_dim_len))
+    updates = 0
+    # polTorque = 0
+    gamma = 0.9
+    transFun = np.zeros((valFun.shape + (3,)))
+    imReward = np.zeros(valFun.shape)
 
+    while updates < 1000:
+        oldPolicy = policy
         # policy evaluation
-        imReward = np.zeroes(len(valfun))
-        for i in range(len(imReward)):
-            # TODO sanitize policy input
-            imReward[i] = getReward((states[0][0], states[0][0], states[0][0] ) , policy[i], theta, fparams)
-        # valfun = policy_evaluation()
+        for i in range(valFun.shape[0]):
+            for j in range(valFun.shape[1]):
+                for k in range(valFun.shape[2]):
+                    if np.isinf(policy[i][j][k]):
+                        imReward[i][j][k] = 0
+                        for act in range(len(actions[0])):
+                            imReward[i][j][k] += getReward((states[0][i], states[1][j], states[2][k]), actions[0][act], theta, fparams)/len(actions[0])
+                        transFun[i][j][k] = getNextState((states[0][i], states[1][j], states[2][k]), np.random.choice(actions[0]), theta, fparams, states)
+
+                    else:
+                        imReward[i][j][k] = getReward((states[0][i], states[1][j], states[2][k]), policy[i][j][k], theta, fparams)
+                        transFun[i][j][k] = getNextState((states[0][i], states[1][j], states[2][k]), policy[i][j][k], theta, fparams, states)
+
+                    # tempValFun = imReward[i][j][k] + gamma*valFun[transFun[i][j][k][0], transFun[i][j][k][1], transFun[i][j][k][2]]
+        valFun = tempValFun
+        # valFun = policy_evaluation()
 
         # greedy policy improvement
         # policy = policy_greedy_update()
+        updates += 1;
 
     # return optimal policy lookup-table
     return policy
@@ -250,7 +267,7 @@ def main():
     print(test1)
     print(test2)
     # Planning via dynamic programming
-    #policy = train_policy(discStates, discActions, theta, fourierparams)
+    policy = train_policy(discStates, discActions, theta, fourierparams)
 
     # plt.scatter(x[0], np.abs(samples[...,2] - yp))
     # plt.scatter(x[0], yp)
