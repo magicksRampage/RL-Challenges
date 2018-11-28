@@ -180,7 +180,6 @@ def getNextState(obs, act, theta, fparams, discStates):
     return discretize(np.array(newState), discStates)
 
 
-# !!! WIP -- DO NOT USE !!!
 # Planes the optimal policy for a MDP defined by:
 # states:   3xNo(DiscSteps) array containing cos(th), sin(th), dot(th)
 # action:   1xNo(DiscSteps) array containing the torque
@@ -211,8 +210,6 @@ def train_policy(states, actions, theta, fparams):
         for i in range(valFun.shape[0]):
             for j in range(valFun.shape[1]):
                 for k in range(valFun.shape[2]):
-                    if j > 5:
-                        print(i, j, k)
                     if np.isinf(policy[i][j][k]):
                         imReward[i][j][k] = 0
                         for act in range(len(actions[0])):
@@ -225,10 +222,24 @@ def train_policy(states, actions, theta, fparams):
 
                     tempValFun[i][j][k] = imReward[i][j][k] + gamma*valFun[read_index_for_state(states, 0, transFun[i][j][k][0])][read_index_for_state(states, 1, transFun[i][j][k][1])][read_index_for_state(states, 2, transFun[i][j][k][2])]
         valFun = tempValFun
-        # valFun = policy_evaluation()
 
         # greedy policy improvement
+        bestTorque = 0
+        tempReward = -np.inf
+        bestReward = -np.inf
+        tempState = np.array((0., 0., 0.))
+        for i in range(valFun.shape[0]):
+            for j in range(valFun.shape[1]):
+                for k in range(valFun.shape[2]):
+                    for act in range(len(actions[0])):
+                        tempState =  getNextState((states[0][i], states[1][j], states[2][k]), act, theta, fparams, states)
+                        tempReward = getReward(tempState, act, theta, fparams)
+                        if tempReward > bestReward:
+                            bestTorque = act
+                    policy[i][j][k] = bestTorque
+                    bestTorque = 0
         # policy = policy_greedy_update()
+
         updates += 1
 
     # return optimal policy lookup-table
@@ -284,6 +295,7 @@ def main():
     # Planning via dynamic programming
     policy = train_policy(discStates, discActions, theta, fourierparams)
 
+    print('Its over')
     # plt.scatter(x[0], np.abs(samples[...,2] - yp))
     # plt.scatter(x[0], yp)
     # plt.scatter(x[0], samples[...,2] )
