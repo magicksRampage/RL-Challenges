@@ -10,13 +10,13 @@ import matplotlib.pyplot as plt
 # gather data for regression using exploration policy (TODO: try better exploration policies)
 # learn dynamics function
 # learn reward function
-# TODO: policy iteration / value iteration
+# policy iteration / value iteration
 # TODO: plot results
 
 
 
-# returns a gym environment depending on the boolean input
-# qube for true, pendulum for false
+# returns a gym environment
+# whichEnv: Boolean --- qube for true, pendulum for false
 def makeEnv(whichEnv):
     if whichEnv:
        return gym.make('Qube-v0')
@@ -24,9 +24,8 @@ def makeEnv(whichEnv):
        return gym.make('Pendulum-v0')
 
 # returns a uniform discrete space
-# args:
-# space - continuous space to be discretized
-# grain - number of desired discrete classes for each dimension of the space
+# space:    continuous space to be discretized
+# grain:    number of desired discrete classes for each dimension of the space
 def discretizeSpace(space, grain):
     shape = space.shape
     highs = space.high
@@ -39,9 +38,8 @@ def discretizeSpace(space, grain):
     return discSpace
 
 # classifies a continuous sample for a discrete space
-# args:
-# sample - continuous sample to be discretized
-# space - discrete space
+# sample:   continuous sample to be discretized
+# space:    discrete space
 def discretize(sample, space):
     discSample = []
     for i in range(len(sample)):
@@ -61,33 +59,34 @@ def discretize(sample, space):
     return np.array(discSample)
 
 # gaussian exploration policy (for pendulum only)
-# obs - current state
+# obs:  current state
 def exploration_policy(obs):
     return [min(2.0, max(-2.0, rnd.gauss(0,1)))]
 
 # generate a number of samples for regression, using an exploration policy
-# env - learning environment
-# numSamples - number of samples to be generated
-# dA - discrete action space
-# dS - discrete state space
-def explore(env, numSamples, dA, dS):
+# env:          learning environment
+# numSamples:   number of samples to be generated
+# actions:           discrete action space
+# states:           discrete state space
+def explore(env, numSamples, actions, states):
     samples = []
     while len(samples) < numSamples:
         done = False
         obs = env.reset()
-        obs = discretize(obs, dS)
+        obs = discretize(obs, states)
         while not done:
             s = [obs]
-            a = discretize(exploration_policy(obs), dA)
+            a = discretize(exploration_policy(obs), actions)
             s.append(a)
             obs, r, done, info = env.step(a)
-            obs = discretize(obs, dS)
+            obs = discretize(obs, states)
             s.append(r)
             s.append(obs)
             samples.append(s)
     return np.array(samples)
 
 # generates an array of random phase shifts for fourier features
+# I:    ???
 def getphi(I):
     phi = []
     for i in range(I):
@@ -95,6 +94,8 @@ def getphi(I):
     return np.array(phi)
 
 # generates a matrix of random weights for fourier features
+# I:    ???
+# J:    ???
 def getP(I,J):
     P = []
     for i in range(I):
@@ -106,23 +107,26 @@ def getP(I,J):
 
 # computes the fourier features for a state observation
 # args:
-# o - state observation
-# P - weight matrix
-# v - wavelength
-# phi - phase shifts
-# numfeat - number of fourier features to be generated
-def fourier(o, P, v, phi, numfeat):
+# obs:      state observation
+# P:        weight matrix
+# v:        wavelength
+# phi:      phase shifts
+# numfeat:  number of fourier features to be generated
+def fourier(obs, P, v, phi, numfeat):
     y = []
     for i in range(numfeat):
         arg = 0
-        for j in range(len(o)):
-            arg += P[i][j] * o[j]
+        for j in range(len(obs)):
+            arg += P[i][j] * obs[j]
         arg /= v
         arg += phi[i]
         y.append(np.sin(arg))
     return np.array(y)
 
 # computes the feature matrix for fourier regression
+# samples:
+# numfeat: number of fourier features to be generated
+# fourierparams:
 def featuremat(samples, numfeat, fourierparams):
     numobs = len(samples[0][0])
     numact = len(samples[0][1])
@@ -163,12 +167,22 @@ def regression(samples, fourierparams):
     #print(theta)
     return theta
 
+# calculates the immediate reward for a state-action pair
+# obs:      ?state?
+# act:      action taken
+# theta:    coefficients for the fourier-approximation
+# fparams:  misc parameters for the fourier features
 def getReward(obs, act, theta, fparams):
     x = np.append(obs,act)
     fx = fourier(x, fparams[0], fparams[1], fparams[2], fparams[3])
     return np.dot(theta[0], fx)
-
-def getNextState(obs, act, theta, fparams, discStates):
+# calculates the projected next state for a state-action pair
+# obs:      ?state?
+# act:      action taken
+# theta:    coefficients for the fourier-approximation
+# fparams:  misc parameters for the fourier features
+# states:   discretized space of states
+def getNextState(obs, act, theta, fparams, states):
     x = np.append(obs,act)
     fx = fourier(x, fparams[0], fparams[1], fparams[2], fparams[3])
     theta_s = theta[1]
@@ -177,14 +191,14 @@ def getNextState(obs, act, theta, fparams, discStates):
     for i in range(len(obs)):
         newState.append(np.dot(theta_s[...,i], fx))
     #print(newState)
-    return discretize(np.array(newState), discStates)
+    return discretize(np.array(newState), states)
 
 
 # Planes the optimal policy for a MDP defined by:
 # states:   3xNo(DiscSteps) array containing cos(th), sin(th), dot(th)
 # action:   1xNo(DiscSteps) array containing the torque
 # theta:    1xNo(Features) array containing the coefficients for the fourier-approximation
-# fparams:  parameters for evaluation of fourier approximation
+# fparams:  misc parameters for evaluation of fourier approximation
 def train_policy(states, actions, theta, fparams):
     # Setup value-function
     # length = No(all possible states)
