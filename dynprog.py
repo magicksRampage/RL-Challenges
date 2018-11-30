@@ -30,10 +30,10 @@ def discretizeSpace(space, grain):
     shape = space.shape
     highs = space.high
     lows = space.low
-    discSpace = np.ones([shape[0],grain+1])
+    discSpace = np.ones([shape[0],grain])
     for i in range(shape[0]):
-        step = (highs[i] - lows[i]) / grain
-        for j in range(grain+1):
+        step = (highs[i] - lows[i]) / (grain - 1)
+        for j in range(grain):
             discSpace[i][j] = lows[i] + j * step
     return discSpace
 
@@ -211,16 +211,19 @@ def train_policy(states, actions, theta, fparams):
 
     # iterate
     oldPolicy = np.full(valFun.shape, np.inf)
-    tempValFun = np.zeros((state_dim_len, state_dim_len, state_dim_len))
+    valFun = np.zeros((state_dim_len, state_dim_len, state_dim_len))
     updates = 0
     # polTorque = 0
     gamma = 0.9
     transFun = np.zeros((valFun.shape + (3,)))
     imReward = np.zeros(valFun.shape)
-
-    while updates < 10:
+    policyStable = False
+    #while udates < 10:
+    while not policyStable:
+        policyStable = True
         oldPolicy = policy
         # policy evaluation
+        maxDelta = 1
         for i in range(valFun.shape[0]):
             for j in range(valFun.shape[1]):
                 for k in range(valFun.shape[2]):
@@ -229,14 +232,20 @@ def train_policy(states, actions, theta, fparams):
                         for act in range(len(actions[0])):
                             imReward[i][j][k] += getReward((states[0][i], states[1][j], states[2][k]), actions[0][act], theta, fparams)/len(actions[0])
                         transFun[i][j][k] = getNextState((states[0][i], states[1][j], states[2][k]), np.random.choice(actions[0]), theta, fparams, states)
-
+                    
                     else:
                         imReward[i][j][k] = getReward((states[0][i], states[1][j], states[2][k]), policy[i][j][k], theta, fparams)
                         transFun[i][j][k] = getNextState((states[0][i], states[1][j], states[2][k]), policy[i][j][k], theta, fparams, states)
 
-                    tempValFun[i][j][k] = imReward[i][j][k] + gamma*valFun[read_index_for_state(states, 0, transFun[i][j][k][0])][read_index_for_state(states, 1, transFun[i][j][k][1])][read_index_for_state(states, 2, transFun[i][j][k][2])]
-        valFun = tempValFun
+        while maxDelta > 0.1:
+            maxDelta = 0
+            for i in range(valFun.shape[0]):
+                for j in range(valFun.shape[1]):
+                    for k in range(valFun.shape[2]):
 
+                        newValFun = imReward[i][j][k] + gamma*valFun[read_index_for_state(states, 0, transFun[i][j][k][0])][read_index_for_state(states, 1, transFun[i][j][k][1])][read_index_for_state(states, 2, transFun[i][j][k][2])]
+                        maxDelta = max(maxDelta, np.abs(newValFun - valFun[i][j][k]))
+                        valFun[i][j][k] = newValFun
         # greedy policy improvement
         bestTorque = 0
         tempReward = -np.inf
@@ -245,11 +254,17 @@ def train_policy(states, actions, theta, fparams):
         for i in range(valFun.shape[0]):
             for j in range(valFun.shape[1]):
                 for k in range(valFun.shape[2]):
-                    for act in range(len(actions[0])):
+                    bestReward = -np.inf
+                    for act in actions[0]:
                         tempState =  getNextState((states[0][i], states[1][j], states[2][k]), act, theta, fparams, states)
-                        tempReward = getReward(tempState, act, theta, fparams)
+                        tempReward = gamma * valFun[read_index_for_state(states, 0, tempState[0])][read_index_for_state(states, 1, tempState[1])][read_index_for_state(states, 2, tempState[2])]
+                        tempReward += getReward((states[0][i], states[1][j], states[2][k]), act, theta, fparams)
                         if tempReward > bestReward:
                             bestTorque = act
+                            bestReward = tempReward
+                    stable = policy[i][j][k] == bestTorque 
+                    if not stable:
+                        policyStable = False
                     policy[i][j][k] = bestTorque
                     bestTorque = 0
         # policy = policy_greedy_update()
@@ -276,8 +291,10 @@ def main():
     # false for pendulum, true for qube
     qube = False
     env = makeEnv(qube)
-    discActions = discretizeSpace(env.action_space, 100)
-    discStates = discretizeSpace(env.observation_space, 10)
+    numActions = 20
+    numStates = 10
+    discActions = discretizeSpace(env.action_space, numActions)
+    discStates = discretizeSpace(env.observation_space, numStates)
     #print(discActions)
     #print(discStates)
     samples = explore(env, 10000, discActions, discStates)
@@ -294,26 +311,29 @@ def main():
     theta = regression(samples, fourierparams)
 
     # for visualizing the regression
-    x = np.ones([4,len(samples)])
-    yp = np.ones([len(samples)])
-    for i in range(len(samples)):
-        x[0][i] = samples[i][0][0]
-        x[1][i] = samples[i][0][1]
-        x[2][i] = samples[i][0][2]
-        x[3][i] = samples[i][1][0]
-        yp[i] = np.dot(theta[0], fourier(x[...,i], P, v, phi, numfeat))
-    test1 = getReward(samples[0][0], samples[0][1], theta, fourierparams)
-    test2 = getNextState(samples[0][0], samples[0][1], theta, fourierparams, discStates)
-    print(test1)
-    print(test2)
+    #x = np.ones([4,len(samples)])
+    #yp = np.ones([len(samples)])
+    #for i in range(len(samples)):
+    #    x[0][i] = samples[i][0][0]
+    #    x[1][i] = samples[i][0][1]
+    #    x[2][i] = samples[i][0][2]
+    #    x[3][i] = samples[i][1][0]
+    #    yp[i] = np.dot(theta[0], fourier(x[...,i], P, v, phi, numfeat))
+    #test1 = getReward(samples[0][0], samples[0][1], theta, fourierparams)
+    #test2 = getNextState(samples[0][0], samples[0][1], theta, fourierparams, discStates)
+    #print(test1)
+    #print(test2)
     # Planning via dynamic programming
     policy = train_policy(discStates, discActions, theta, fourierparams)
 
     print('Its over')
+    #print(policy)
+    policy_iterator = policy.reshape(1,numStates * numStates * numStates)
+    plt.scatter(range(numStates * numStates * numStates), policy_iterator[0])
     # plt.scatter(x[0], np.abs(samples[...,2] - yp))
     # plt.scatter(x[0], yp)
     # plt.scatter(x[0], samples[...,2] )
-    # plt.show()
+    plt.show()
 
 
 # For automatic execution
