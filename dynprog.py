@@ -3,6 +3,8 @@ import quanser_robots
 import numpy as np
 import random as rnd
 import matplotlib.pyplot as plt
+from time import *
+from math import *
 
 
 # dynamic programming algorithm
@@ -38,33 +40,75 @@ def discretize_space(space, grain):
             discSpace[i][j] = lows[i] + j * step
     return discSpace
 
+# returns a uniform discrete space
+# space:    continuous space to be discretized
+# grain:    number of desired discrete classes for each dimension of the space
+# cubes: array of bool, if cubed or not
+def discretize_space_cube(space, grain, cubed):
+    shape = space.shape
+    highs = space.high
+    lows = space.low
+    discSpace = np.ones([shape[0],grain])
+    for i in range(shape[0]):
+        step = (highs[i] - lows[i]) / (grain - 1)
+        for j in range(grain):
+            discSpace[i][j] = lows[i] + j * step
+        if (cubed[i]):
+            highest=highs[i]
+            if (abs(lows[i])>highest):
+                highest=lows[i]
+            discSpace[i]=(discSpace[i]**3)/(highest**2)
+    return discSpace
 
 # classifies a continuous sample for a discrete space
 # sample:   continuous sample to be discretized
 # space:    discrete space
 def discretize_state(sample, space):
+    return _discretize(sample,space)[0]
+
+def _discretize(sample,space):
     discSample = []
+    positions=[]
     for i in range(len(sample)):
         entry = np.clip(sample[i], space[i][0], space[i][-1])
         for j in range(len(space[i])):
             step = space[i][j]
             if entry == step:
                 discSample.append(step)
+                positions.append(j)
                 break
             elif entry < step:
                 prev = space[i][j - 1]
                 if np.abs(entry - prev) > np.abs(entry - step):
                     discSample.append(step)
+                    positions.append(j)
                 else:
                     discSample.append(prev)
+                    positions.append(j-1)
                 break
-    return np.array(discSample)
+    return [np.array(discSample),np.array(positions)]
 
 
 # gaussian exploration policy (for pendulum only)
 # obs:  current state
 def exploration_policy(obs):
-    return [min(2.0, max(-2.0, rnd.gauss(0, 1)))]
+    zufall=rnd.gauss(0,1)
+    value=zufall
+    vel=obs[1]
+    #value=vel/8+zufall
+    if(obs[0]>1.57 or obs[0]<-1.57):
+    #    if(obs[0]<0.8):
+        sig=copysign(1.5,vel)
+        #value=copysign(2,vel)#+rnd.gauss(0,0.5)
+        value=rnd.gauss(sig,0.5)
+    else:
+        value=rnd.gauss(0,1)
+    #if (zufall<0):
+    #    value=-1
+    #else:
+    #    value=1
+    return [min(2.0, max(-2.0, value))]
+#return [0]
 
 
 # generate a number of samples for regression, using an exploration policy
@@ -73,20 +117,32 @@ def exploration_policy(obs):
 # actions:      discrete action space
 # states:       discrete state space
 def explore(env, numSamples, actions, states):
+    print("start explore")
     samples = []
+    renderCount=15
+    render=True
     while len(samples) < numSamples:
         done = False
-        obs = env.reset()
-        discState = discretize_state(obs, states)
+        discState = env.reset()
+        #print("reset")
+        discState = discretize_state(discState, states)
         while not done:
             s = [discState]
-            a = discretize_state(exploration_policy(obs), actions)
+            a = discretize_state(exploration_policy(discState), actions)
             s.append(a)
             obs, reward, done, info = env.step(a)
+            if(render):
+                env.render()
             discState = discretize_state(obs, states)
             s.append(reward)
             s.append(discState)
             samples.append(s)
+        if(renderCount>0):
+            renderCount-=1
+            if renderCount==0:
+                render=False
+
+    print("end explore")
     return np.array(samples)
 
 
@@ -363,8 +419,10 @@ def train_policy(states, actions, theta, fparams):
             prevState = ()
             it.iternext()
 
+        print("update:"+str(updates))
         updates += 1
 
+    print("updates: " + str(updates))
     # return optimal policy lookup-table
     return policy
 
@@ -374,24 +432,34 @@ def train_policy(states, actions, theta, fparams):
 # dimension:    state dimension in which the value is to be found
 # stateVal:     the Value for which to find the index
 def read_index_for_state(states, dimension, stateVal):
-    dimLen = len(states[dimension])
-    dimMax = states[dimension][-1]
-    dimMin = states[dimension][0]
-    step = (dimMax - dimMin) / (dimLen - 1)
-    index = (stateVal - dimMin) / step
-    return int(round(max(dimMin, min(dimMax, index))))
+    #import pdb; pdb.set_trace()
+    #TODO @Tim unser Code soll schoener werden
+    if(dimension==1):
+        return _discretize([0,stateVal],states)[1][dimension]
+    if(dimension==2):
+        return _discretize([0,0,stateVal],states)[1][dimension]
+    if(dimension==3):
+        return _discretize([0,0,0,stateVal],states)[1][dimension]
+    return _discretize([stateVal],states)[1][dimension]
+    #dimLen = len(states[dimension])
+    #dimMax = states[dimension][-1]
+    #dimMin = states[dimension][0]
+    #step = (dimMax - dimMin) / (dimLen - 1)
+    #index = (stateVal - dimMin) / step
+    #return int(round(max(dimMin, min(dimMax, index))))
 
 
 def main():
+    t1=clock()
     # false for pendulum, true for qube
     qube = False
     env = makeEnv(qube)
-    numActions = 20
-    numStates = 10
-    discActions = discretize_space(env.action_space, numActions)
-    discStates = discretize_space(env.observation_space, numStates)
-    # print(discActions)
-    # print(discStates)
+    numActions = 21
+    numStates = 33
+    discActions = discretize_space_cube(env.action_space, numActions, [True])
+    discStates = discretize_space_cube(env.observation_space, numStates, [1,1,1,1])
+    #print(discActions)
+    #print(discStates)
     samples = explore(env, 10000, discActions, discStates)
     # print(len(samples))
     # print(samples[0])
@@ -422,14 +490,31 @@ def main():
     policy = train_policy(discStates, discActions, theta, fourierparams)
 
     print('Its over')
-    # print(policy)
-    policy_iterator = policy.reshape(1, numStates * numStates * numStates)
-    plt.scatter(range(numStates * numStates * numStates), policy_iterator[0])
+    t2=clock()
+    print("Rechenzeit = " + str(t2-t1))
+    #print(policy)
+    #policy_iterator = policy.reshape(1,numStates * numStates * numStates)
+    #plt.scatter(range(numStates * numStates * numStates), policy_iterator[0])
     # plt.scatter(x[0], np.abs(samples[...,2] - yp))
     # plt.scatter(x[0], yp)
     # plt.scatter(x[0], samples[...,2] )
-    plt.show()
+    #plt.show()
+    for trials in range(3):
+        obs=env.reset()
+        for i in range(300):
+            #print("iteration:"+str(i))
+            dis_obs=discretize_state(obs,discStates)
+            index=[]
+            index+=[read_index_for_state(discStates,0,dis_obs[0])]
+            index+=[read_index_for_state(discStates,1,dis_obs[1])]
+            #import pdb; pdb.set_trace()
+            #act=policy[index[0]][index[1]][index[2]]
+            act=policy[tuple(index)]
+            obs, rew, done,_ = env.step([act])
+            print(""+str(i)+" : "+str(rew)+" -- "+str(obs[0])+" "+str(obs[1]))
+            env.render()
 
+    import pdb; pdb.set_trace()
 
 # For automatic execution
 main()
