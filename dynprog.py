@@ -4,6 +4,7 @@ import numpy as np
 import random as rnd
 import matplotlib.pyplot as plt
 
+
 # dynamic programming algorithm
 # steps:
 # discretize state and action spaces (TODO: try better discretizations)
@@ -13,15 +14,14 @@ import matplotlib.pyplot as plt
 # policy iteration / value iteration
 # TODO: plot results
 
-
-
 # returns a gym environment
 # whichEnv: Boolean --- qube for true, pendulum for false
 def makeEnv(whichEnv):
     if whichEnv:
-       return gym.make('Qube-v0')
+        return gym.make('Qube-v0')
     else:
-       return gym.make('Pendulum-v0')
+        return gym.make('Pendulum-v2')
+
 
 # returns a uniform discrete space
 # space:    continuous space to be discretized
@@ -31,12 +31,13 @@ def discretize_space(space, grain):
     shape = space.shape
     highs = space.high
     lows = space.low
-    discSpace = np.ones([shape[0],grain])
+    discSpace = np.ones([shape[0], grain])
     for i in range(shape[0]):
         step = (highs[i] - lows[i]) / (grain - 1)
         for j in range(grain):
             discSpace[i][j] = lows[i] + j * step
     return discSpace
+
 
 # classifies a continuous sample for a discrete space
 # sample:   continuous sample to be discretized
@@ -51,7 +52,7 @@ def discretize_state(sample, space):
                 discSample.append(step)
                 break
             elif entry < step:
-                prev = space[i][j-1]
+                prev = space[i][j - 1]
                 if np.abs(entry - prev) > np.abs(entry - step):
                     discSample.append(step)
                 else:
@@ -59,10 +60,12 @@ def discretize_state(sample, space):
                 break
     return np.array(discSample)
 
+
 # gaussian exploration policy (for pendulum only)
 # obs:  current state
 def exploration_policy(obs):
-    return [min(2.0, max(-2.0, rnd.gauss(0,1)))]
+    return [min(2.0, max(-2.0, rnd.gauss(0, 1)))]
+
 
 # generate a number of samples for regression, using an exploration policy
 # env:          learning environment
@@ -86,6 +89,7 @@ def explore(env, numSamples, actions, states):
             samples.append(s)
     return np.array(samples)
 
+
 # generates an array of random phase shifts for fourier features
 # numFeats:     number of fourier features
 def getphi(numFeats):
@@ -93,6 +97,7 @@ def getphi(numFeats):
     for i in range(numFeats):
         phi.append(rnd.random() * 2 * np.pi - np.pi)
     return np.array(phi)
+
 
 # generates a matrix of random weights for fourier features
 # NumFeats:             number of requested fourier features
@@ -102,9 +107,10 @@ def getP(numFeats, sumNumStateActions):
     for i in range(numFeats):
         Pi = []
         for j in range(sumNumStateActions):
-            Pi.append(rnd.gauss(0,1))
+            Pi.append(rnd.gauss(0, 1))
         P.append(Pi)
     return np.array(P)
+
 
 # computes the fourier features for a state observation
 # obs:      state observation
@@ -122,6 +128,7 @@ def fourier(obs, P, v, phi, numFeats):
         arg += phi[i]
         y.append(np.sin(arg))
     return np.array(y)
+
 
 # computes the feature matrix for fourier regression
 # samples:          contains the samples from the regression
@@ -143,6 +150,7 @@ def featuremat(samples, numFeats, fourierparams):
 
     return mat
 
+
 # executes fourier regression for the given samples and returns theta
 # ---theta[0] contains the parameters for the reward function
 # ---theta[1] contains the parameters for the dynamics function
@@ -153,23 +161,24 @@ def regression(samples, fourierparams):
     theta = []
     numfeat = fourierparams[3]
     features = featuremat(samples, numfeat, fourierparams)
-    #print(features)
+    # print(features)
     feat_inverse = np.linalg.pinv(features)
-    #print(feat_inverse)
-    rewards = samples[...,2]
-    #print(rewards)
-    next_states = np.array(list(samples[...,3]))
-    #print(next_states.shape)
-    theta_r = np.dot(feat_inverse,rewards)
-    #print(theta_r.shape)
-    #print(theta_r)
+    # print(feat_inverse)
+    rewards = samples[..., 2]
+    # print(rewards)
+    next_states = np.array(list(samples[..., 3]))
+    # print(next_states.shape)
+    theta_r = np.dot(feat_inverse, rewards)
+    # print(theta_r.shape)
+    # print(theta_r)
     theta.append(theta_r)
-    theta_dyn = np.dot(feat_inverse,next_states)
-    #print(theta_dyn.shape)
-    #print(theta_dyn)
+    theta_dyn = np.dot(feat_inverse, next_states)
+    # print(theta_dyn.shape)
+    # print(theta_dyn)
     theta.append(theta_dyn)
-    #print(theta)
+    # print(theta)
     return theta
+
 
 # calculates the immediate reward for a state-action pair
 # obs:      state observation
@@ -177,9 +186,10 @@ def regression(samples, fourierparams):
 # theta:    coefficients for the fourier-approximation
 # fparams:  misc parameters for the fourier features
 def getReward(obs, act, theta, fparams):
-    x = np.append(obs,act)
+    x = np.append(obs, act)
     fx = fourier(x, fparams[0], fparams[1], fparams[2], fparams[3])
     return np.dot(theta[0], fx)
+
 
 # calculates the projected next state for a state-action pair
 # state:    previous state tupel
@@ -193,11 +203,11 @@ def getNextState(state, act, theta, fparams, states):
     x = np.append(state, act)
     fx = fourier(x, fparams[0], fparams[1], fparams[2], fparams[3])
     theta_s = theta[1]
-    #print(theta_s[...,0])
+    # print(theta_s[...,0])
     newState = []
     for i in range(len(state)):
-        newState.append(np.dot(theta_s[...,i], fx))
-    #print(newState)
+        newState.append(np.dot(theta_s[..., i], fx))
+    # print(newState)
     return discretize_state(np.array(newState), states)
 
 
@@ -209,72 +219,149 @@ def getNextState(state, act, theta, fparams, states):
 def train_policy(states, actions, theta, fparams):
     # Setup value-function
     # length = No(all possible states)
-    state_dim_len = states.shape[1]
-    valFun = np.zeros((state_dim_len, state_dim_len, state_dim_len))
+    explicitStatesShape = ()
+    for dim in range(states.shape[0]):
+        explicitStatesShape += (states.shape[1],)
+    valFun = np.zeros(explicitStatesShape)
 
     # Contains amount of torque
     # if t == np.inf torque is random
-    policy = np.full(valFun.shape, np.inf)
+    policy = np.full(explicitStatesShape, np.inf)
 
     # iterate
-    oldPolicy = np.full(valFun.shape, np.inf)
-    valFun = np.zeros((state_dim_len, state_dim_len, state_dim_len))
+    oldPolicy = np.full(explicitStatesShape, np.inf)
+    valFun = np.zeros(explicitStatesShape)
     updates = 0
     # polTorque = 0
     gamma = 0.9
-    transFun = np.zeros((valFun.shape + (3,)))
-    imReward = np.zeros(valFun.shape)
+    transFun = np.zeros(explicitStatesShape + (states.shape[0],))
+    imReward = np.zeros(explicitStatesShape)
     policyStable = False
-    #while udates < 10:
+    # while udates < 10:
     while not policyStable:
         policyStable = True
         oldPolicy = policy
         # policy evaluation
         maxDelta = 1
-        for i in range(valFun.shape[0]):
-            for j in range(valFun.shape[1]):
-                for k in range(valFun.shape[2]):
-                    if np.isinf(policy[i][j][k]):
-                        imReward[i][j][k] = 0
-                        for act in range(len(actions[0])):
-                            imReward[i][j][k] += getReward((states[0][i], states[1][j], states[2][k]), actions[0][act], theta, fparams)/len(actions[0])
-                        transFun[i][j][k] = getNextState((states[0][i], states[1][j], states[2][k]), np.random.choice(actions[0]), theta, fparams, states)
-                    
-                    else:
-                        imReward[i][j][k] = getReward((states[0][i], states[1][j], states[2][k]), policy[i][j][k], theta, fparams)
-                        transFun[i][j][k] = getNextState((states[0][i], states[1][j], states[2][k]), policy[i][j][k], theta, fparams, states)
+
+        # for i in range(valFun.shape[0]):
+        #     for j in range(valFun.shape[1]):
+        #         for k in range(valFun.shape[2]):
+        #             if np.isinf(policy[i][j][k]):
+        #                 imReward[i][j][k] = 0
+        #                 for act in range(len(actions[0])):
+        #                     imReward[i][j][k] += getReward((states[0][i], states[1][j], states[2][k]), actions[0][act], theta, fparams)/len(actions[0])
+        #                 transFun[i][j][k] = getNextState((states[0][i], states[1][j], states[2][k]), np.random.choice(actions[0]), theta, fparams, states)
+        #
+        #             else:
+        #                 imReward[i][j][k] = getReward((states[0][i], states[1][j], states[2][k]), policy[i][j][k], theta, fparams)
+        #                 transFun[i][j][k] = getNextState((states[0][i], states[1][j], states[2][k]), policy[i][j][k], theta, fparams, states)
+
+        it = np.nditer(valFun, flags=['multi_index'])
+        tempReward = 0
+        tempState = ()
+        mulInd = 0
+        while not it.finished:
+            tempReward = 0
+            tempState = ()
+            mulInd = it.multi_index
+            for dim in range(len(mulInd)):
+                tempState += (states[dim][mulInd[dim]],)
+
+            if np.isinf(policy.item(mulInd)):
+                for act in range(len(actions[0])):
+                    tempReward += getReward(tempState, actions[0][act], theta, fparams) / len(actions[0])
+                imReward[mulInd] = tempReward
+                # TODO: Is that the right way to start out?
+                transFun[mulInd] = getNextState(tempState, np.random.choice(actions[0]), theta, fparams, states)
+            else:
+                imReward[mulInd] = getReward(tempState, policy.item(mulInd), theta, fparams)
+                transFun[mulInd] = getNextState(tempState, policy.item(mulInd), theta, fparams, states)
+            it.iternext()
+
+        # while maxDelta > 0.1:
+        #     maxDelta = 0
+        #     for i in range(valFun.shape[0]):
+        #         for j in range(valFun.shape[1]):
+        #             for k in range(valFun.shape[2]):
+        #
+        #                 newValFun = imReward[i][j][k] + gamma*valFun[read_index_for_state(states, 0, transFun[i][j][k][0])][read_index_for_state(states, 1, transFun[i][j][k][1])][read_index_for_state(states, 2, transFun[i][j][k][2])]
+        #                 maxDelta = max(maxDelta, np.abs(newValFun - valFun[i][j][k]))
+        #                 valFun[i][j][k] = newValFun
 
         while maxDelta > 0.1:
             maxDelta = 0
-            for i in range(valFun.shape[0]):
-                for j in range(valFun.shape[1]):
-                    for k in range(valFun.shape[2]):
+            it = np.nditer(valFun, flags=['multi_index'])
+            mulInd = 0
+            tempStateInd = ()
+            while not it.finished:
+                mulInd = it.multi_index
+                for dim in range(len(mulInd)):
+                    tempStateInd += (read_index_for_state(states, dim, transFun.item(mulInd + (dim,))),)
 
-                        newValFun = imReward[i][j][k] + gamma*valFun[read_index_for_state(states, 0, transFun[i][j][k][0])][read_index_for_state(states, 1, transFun[i][j][k][1])][read_index_for_state(states, 2, transFun[i][j][k][2])]
-                        maxDelta = max(maxDelta, np.abs(newValFun - valFun[i][j][k]))
-                        valFun[i][j][k] = newValFun
+                newValfun = imReward.item(mulInd) + gamma * valFun.item(tempStateInd)
+                maxDelta = max(maxDelta, np.abs(newValfun - valFun.item(mulInd)))
+                valFun[mulInd] = newValfun
+
+                tempStateInd = ()
+                it.iternext()
+
         # greedy policy improvement
+        # bestTorque = 0
+        # tempReward = -np.inf
+        # bestReward = -np.inf
+        # tempState = np.array((0., 0., 0.))
+        # for i in range(valFun.shape[0]):
+        #     for j in range(valFun.shape[1]):
+        #         for k in range(valFun.shape[2]):
+        #             bestReward = -np.inf
+        #             for act in actions[0]:
+        #                 tempState = getNextState((states[0][i], states[1][j], states[2][k]), act, theta, fparams,
+        #                                          states)
+        #                 tempReward = gamma * valFun[read_index_for_state(states, 0, tempState[0])][
+        #                     read_index_for_state(states, 1, tempState[1])][
+        #                     read_index_for_state(states, 2, tempState[2])]
+        #                 tempReward += getReward((states[0][i], states[1][j], states[2][k]), act, theta, fparams)
+        #                 if tempReward > bestReward:
+        #                     bestTorque = act
+        #                     bestReward = tempReward
+        #             stable = policy[i][j][k] == bestTorque
+        #             if not stable:
+        #                 policyStable = False
+        #             policy[i][j][k] = bestTorque
+        #             bestTorque = 0
+
+        it = np.nditer(valFun, flags=['multi_index'])
         bestTorque = 0
         tempReward = -np.inf
         bestReward = -np.inf
-        tempState = np.array((0., 0., 0.))
-        for i in range(valFun.shape[0]):
-            for j in range(valFun.shape[1]):
-                for k in range(valFun.shape[2]):
-                    bestReward = -np.inf
-                    for act in actions[0]:
-                        tempState =  getNextState((states[0][i], states[1][j], states[2][k]), act, theta, fparams, states)
-                        tempReward = gamma * valFun[read_index_for_state(states, 0, tempState[0])][read_index_for_state(states, 1, tempState[1])][read_index_for_state(states, 2, tempState[2])]
-                        tempReward += getReward((states[0][i], states[1][j], states[2][k]), act, theta, fparams)
-                        if tempReward > bestReward:
-                            bestTorque = act
-                            bestReward = tempReward
-                    stable = policy[i][j][k] == bestTorque 
-                    if not stable:
-                        policyStable = False
-                    policy[i][j][k] = bestTorque
-                    bestTorque = 0
-        # policy = policy_greedy_update()
+        prevState = ()
+        nextState = ()
+        nextStateInd = ()
+        mulInd = 0
+        while not it.finished:
+            mulInd = it.multi_index
+            for dim in range(len(mulInd)):
+                prevState += (states[dim][mulInd[dim]],)
+            for act in actions[0]:
+                nextState = getNextState(prevState, act, theta, fparams, states)
+                for dim in range(len(mulInd)):
+                    nextStateInd += (read_index_for_state(states, dim, nextState[dim]), )
+                tempReward = getReward(prevState, act, theta,fparams) + gamma * valFun [nextStateInd]
+                if tempReward > bestReward:
+                    bestTorque = act
+                    bestReward = tempReward
+                tempReward = -np.inf
+                nextState = ()
+                nextStateInd = ()
+            stable = (policy[mulInd] == bestTorque)
+            if not stable:
+                policyStable = False
+            policy[mulInd] = bestTorque
+            bestReward = -np.inf
+            bestTorque = 0
+            prevState = ()
+            it.iternext()
 
         updates += 1
 
@@ -288,11 +375,12 @@ def train_policy(states, actions, theta, fparams):
 # stateVal:     the Value for which to find the index
 def read_index_for_state(states, dimension, stateVal):
     dimLen = len(states[dimension])
-    dimMax = states[dimension][dimLen-1]
+    dimMax = states[dimension][-1]
     dimMin = states[dimension][0]
-    step = (dimMax - dimMin)/(dimLen-1)
+    step = (dimMax - dimMin) / (dimLen - 1)
     index = (stateVal - dimMin) / step
-    return int(round(index))
+    return int(round(max(dimMin, min(dimMax, index))))
+
 
 def main():
     # false for pendulum, true for qube
@@ -302,15 +390,15 @@ def main():
     numStates = 10
     discActions = discretize_space(env.action_space, numActions)
     discStates = discretize_space(env.observation_space, numStates)
-    #print(discActions)
-    #print(discStates)
+    # print(discActions)
+    # print(discStates)
     samples = explore(env, 10000, discActions, discStates)
-    #print(len(samples))
-    #print(samples[0])
+    # print(len(samples))
+    # print(samples[0])
     numobs = len(samples[0][0])
     numact = len(samples[0][1])
     numfeat = 20
-    P = getP(numfeat,numobs+numact)
+    P = getP(numfeat, numobs + numact)
     v = 10
     phi = getphi(numfeat)
     fourierparams = [P, v, phi, numfeat]
@@ -318,24 +406,24 @@ def main():
     theta = regression(samples, fourierparams)
 
     # for visualizing the regression
-    #x = np.ones([4,len(samples)])
-    #yp = np.ones([len(samples)])
-    #for i in range(len(samples)):
+    # x = np.ones([4,len(samples)])
+    # yp = np.ones([len(samples)])
+    # for i in range(len(samples)):
     #    x[0][i] = samples[i][0][0]
     #    x[1][i] = samples[i][0][1]
     #    x[2][i] = samples[i][0][2]
     #    x[3][i] = samples[i][1][0]
     #    yp[i] = np.dot(theta[0], fourier(x[...,i], P, v, phi, numfeat))
-    #test1 = getReward(samples[0][0], samples[0][1], theta, fourierparams)
-    #test2 = getNextState(samples[0][0], samples[0][1], theta, fourierparams, discStates)
-    #print(test1)
-    #print(test2)
+    # test1 = getReward(samples[0][0], samples[0][1], theta, fourierparams)
+    # test2 = getNextState(samples[0][0], samples[0][1], theta, fourierparams, discStates)
+    # print(test1)
+    # print(test2)
     # Planning via dynamic programming
     policy = train_policy(discStates, discActions, theta, fourierparams)
 
     print('Its over')
-    #print(policy)
-    policy_iterator = policy.reshape(1,numStates * numStates * numStates)
+    # print(policy)
+    policy_iterator = policy.reshape(1, numStates * numStates * numStates)
     plt.scatter(range(numStates * numStates * numStates), policy_iterator[0])
     # plt.scatter(x[0], np.abs(samples[...,2] - yp))
     # plt.scatter(x[0], yp)
