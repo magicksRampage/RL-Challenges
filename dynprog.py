@@ -26,7 +26,8 @@ def makeEnv(whichEnv):
 # returns a uniform discrete space
 # space:    continuous space to be discretized
 # grain:    number of desired discrete classes for each dimension of the space
-def discretizeSpace(space, grain):
+#           TODO: length of disc. space is 1 longer then indicated by grains
+def discretize_space(space, grain):
     shape = space.shape
     highs = space.high
     lows = space.low
@@ -40,7 +41,7 @@ def discretizeSpace(space, grain):
 # classifies a continuous sample for a discrete space
 # sample:   continuous sample to be discretized
 # space:    discrete space
-def discretize(sample, space):
+def discretize_state(sample, space):
     discSample = []
     for i in range(len(sample)):
         entry = np.clip(sample[i], space[i][0], space[i][-1])
@@ -66,55 +67,54 @@ def exploration_policy(obs):
 # generate a number of samples for regression, using an exploration policy
 # env:          learning environment
 # numSamples:   number of samples to be generated
-# actions:           discrete action space
-# states:           discrete state space
+# actions:      discrete action space
+# states:       discrete state space
 def explore(env, numSamples, actions, states):
     samples = []
     while len(samples) < numSamples:
         done = False
         obs = env.reset()
-        obs = discretize(obs, states)
+        discState = discretize_state(obs, states)
         while not done:
-            s = [obs]
-            a = discretize(exploration_policy(obs), actions)
+            s = [discState]
+            a = discretize_state(exploration_policy(obs), actions)
             s.append(a)
-            obs, r, done, info = env.step(a)
-            obs = discretize(obs, states)
-            s.append(r)
-            s.append(obs)
+            obs, reward, done, info = env.step(a)
+            discState = discretize_state(obs, states)
+            s.append(reward)
+            s.append(discState)
             samples.append(s)
     return np.array(samples)
 
 # generates an array of random phase shifts for fourier features
-# I:    ???
-def getphi(I):
+# numFeats:     number of fourier features
+def getphi(numFeats):
     phi = []
-    for i in range(I):
+    for i in range(numFeats):
         phi.append(rnd.random() * 2 * np.pi - np.pi)
     return np.array(phi)
 
 # generates a matrix of random weights for fourier features
-# I:    ???
-# J:    ???
-def getP(I,J):
+# NumFeats:             number of requested fourier features
+# sumNumStateActions:   sum of the number of States and number of Actions
+def getP(numFeats, sumNumStateActions):
     P = []
-    for i in range(I):
+    for i in range(numFeats):
         Pi = []
-        for j in range(J):
+        for j in range(sumNumStateActions):
             Pi.append(rnd.gauss(0,1))
         P.append(Pi)
     return np.array(P)
 
 # computes the fourier features for a state observation
-# args:
 # obs:      state observation
 # P:        weight matrix
 # v:        wavelength
 # phi:      phase shifts
 # numfeat:  number of fourier features to be generated
-def fourier(obs, P, v, phi, numfeat):
+def fourier(obs, P, v, phi, numFeats):
     y = []
-    for i in range(numfeat):
+    for i in range(numFeats):
         arg = 0
         for j in range(len(obs)):
             arg += P[i][j] * obs[j]
@@ -124,27 +124,31 @@ def fourier(obs, P, v, phi, numfeat):
     return np.array(y)
 
 # computes the feature matrix for fourier regression
-# samples:
-# numfeat: number of fourier features to be generated
-# fourierparams:
-def featuremat(samples, numfeat, fourierparams):
+# samples:          contains the samples from the regression
+#                       [[discState, action, reward, nextDiscState]]
+# numfeat:          number of fourier features to be generated
+# fourierparams:    contains P, v, phi and the desired number of fourier features
+def featuremat(samples, numFeats, fourierparams):
     numobs = len(samples[0][0])
     numact = len(samples[0][1])
     numsamp = len(samples)
     P = fourierparams[0]
     v = fourierparams[1]
     phi = fourierparams[2]
-    mat = np.ones([numsamp,numfeat])
+    mat = np.ones([numsamp, numFeats])
     for i in range(numsamp):
         curr_samp = samples[i]
         x = np.append(curr_samp[0], curr_samp[1])
-        mat[i] = fourier(x, P, v, phi, numfeat)
+        mat[i] = fourier(x, P, v, phi, numFeats)
 
     return mat
 
-# executes fourier regression for the given samples
-# theta[0] contains the parameters for the reward function
-# theta[1] contains the parameters for the dynamics function
+# executes fourier regression for the given samples and returns theta
+# ---theta[0] contains the parameters for the reward function
+# ---theta[1] contains the parameters for the dynamics function
+# samples:          contains the samples from the regression
+#                   ---[[discState, action, reward, nextDiscState]]
+# fourierparams:    contains P, v, phi and the desired number of fourier features
 def regression(samples, fourierparams):
     theta = []
     numfeat = fourierparams[3]
@@ -168,7 +172,7 @@ def regression(samples, fourierparams):
     return theta
 
 # calculates the immediate reward for a state-action pair
-# obs:      ?state?
+# obs:      state observation
 # act:      action taken
 # theta:    coefficients for the fourier-approximation
 # fparams:  misc parameters for the fourier features
@@ -176,22 +180,25 @@ def getReward(obs, act, theta, fparams):
     x = np.append(obs,act)
     fx = fourier(x, fparams[0], fparams[1], fparams[2], fparams[3])
     return np.dot(theta[0], fx)
+
 # calculates the projected next state for a state-action pair
-# obs:      ?state?
+# state:    previous state tupel
 # act:      action taken
 # theta:    coefficients for the fourier-approximation
+#           ---theta[0] contains the parameters for the reward function
+#           ---theta[1] contains the parameters for the dynamics function
 # fparams:  misc parameters for the fourier features
 # states:   discretized space of states
-def getNextState(obs, act, theta, fparams, states):
-    x = np.append(obs,act)
+def getNextState(state, act, theta, fparams, states):
+    x = np.append(state, act)
     fx = fourier(x, fparams[0], fparams[1], fparams[2], fparams[3])
     theta_s = theta[1]
     #print(theta_s[...,0])
     newState = []
-    for i in range(len(obs)):
+    for i in range(len(state)):
         newState.append(np.dot(theta_s[...,i], fx))
     #print(newState)
-    return discretize(np.array(newState), states)
+    return discretize_state(np.array(newState), states)
 
 
 # Planes the optimal policy for a MDP defined by:
@@ -293,8 +300,8 @@ def main():
     env = makeEnv(qube)
     numActions = 20
     numStates = 10
-    discActions = discretizeSpace(env.action_space, numActions)
-    discStates = discretizeSpace(env.observation_space, numStates)
+    discActions = discretize_space(env.action_space, numActions)
+    discStates = discretize_space(env.observation_space, numStates)
     #print(discActions)
     #print(discStates)
     samples = explore(env, 10000, discActions, discStates)
