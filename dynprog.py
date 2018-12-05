@@ -43,7 +43,7 @@ def discretize_space(space, grain):
 # returns a uniform discrete space
 # space:    continuous space to be discretized
 # grain:    number of desired discrete classes for each dimension of the space
-# cubes: array of bool, if cubed or not
+# exponent: [0,1,sonstiges]=linear;  2=squared;  3=cubed
 def discretize_space_cube(space, grain, cubed):
     shape = space.shape
     highs = space.high
@@ -53,11 +53,18 @@ def discretize_space_cube(space, grain, cubed):
         step = (highs[i] - lows[i]) / (grain - 1)
         for j in range(grain):
             discSpace[i][j] = lows[i] + j * step
-        if (cubed[i]):
+        if (cubed[i]>1):
             highest=highs[i]
             if (abs(lows[i])>highest):
                 highest=lows[i]
-            discSpace[i]=(discSpace[i]**3)/(highest**2)
+            if(cubed[i]==3):
+                discSpace[i]=(discSpace[i]**3)/(highest**2)
+            elif(cubed[i]==2):
+                vz=np.ones(len(discSpace[i]))#vorzeichen
+                for k in range(len(discSpace[i])):
+                    vz[k]=np.copysign(vz[k],discSpace[i][k])
+                discSpace[i]=vz*(discSpace[i]**2)/(highest)
+
     return discSpace
 
 # classifies a continuous sample for a discrete space
@@ -471,9 +478,14 @@ def main():
     qube = False
     env = makeEnv(qube)
     numActions = 5
-    numStates = 201
-    discActions = discretize_space_cube(env.action_space, numActions, [True])
-    discStates = discretize_space_cube(env.observation_space, numStates, [1,1,1,1])
+    numStates = 21
+    discActions = discretize_space_cube(env.action_space, numActions, [3])
+    discStates = discretize_space_cube(env.observation_space, numStates, [2,2,2,2])
+    discCube=discretize_space_cube(env.observation_space,numStates,[3,3,3,3])
+    plot_discretisation(
+                    [np.sin(discStates[0]),np.sin(discCube[0])],
+                    [np.cos(discStates[0]),np.cos(discCube[0])],['o','.'])
+    #plt.show()
     #print(discActions)
     #print(discStates)
     samples = explore(env, 10000, discActions, discStates)
@@ -555,6 +567,16 @@ def main():
        yp[i] = np.square(validation[i][2] - validation[i][4])
     plt.scatter(x[0], yp)
     plt.show()
+
+def plot_discretisation(x,y,opt):
+    l=len(x)
+    if len(y)<l:
+        l=len(y)
+    fig,ax=plt.subplots()
+    for i in range(l):
+        ax.plot(x[i],y[i],opt[i])
+    ax.set_aspect('equal')
+    #plt.show()
 
 # For automatic execution
 main()
