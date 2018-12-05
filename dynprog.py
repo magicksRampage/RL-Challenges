@@ -89,6 +89,20 @@ def _discretize(sample,space):
     return [np.array(discSample),np.array(positions)]
 
 
+def expand_angles(samples):
+    for sample in samples:
+        old_angle = sample[0][0]
+        new_angle = sample[3][0]
+        #print(sample)
+        #print("old: " + str(old_angle) + ", new: " + str(new_angle))
+        if np.abs(old_angle - new_angle) > 5:
+            #print("replacing")
+            if new_angle > 0:
+                sample[3][0] = new_angle - 2 * np.pi
+            else:
+                sample[3][0] = new_angle + 2 * np.pi
+            #print(sample)
+
 # gaussian exploration policy (for pendulum only)
 # obs:  current state
 def exploration_policy(obs):
@@ -291,7 +305,7 @@ def train_policy(states, actions, theta, fparams):
     valFun = np.zeros(explicitStatesShape)
     updates = 0
     # polTorque = 0
-    gamma = 0.9
+    gamma = 0.99
     transFun = np.zeros(explicitStatesShape + (states.shape[0],))
     imReward = np.zeros(explicitStatesShape)
     policyStable = False
@@ -457,7 +471,7 @@ def main():
     qube = False
     env = makeEnv(qube)
     numActions = 5
-    numStates = 51
+    numStates = 201
     discActions = discretize_space_cube(env.action_space, numActions, [True])
     discStates = discretize_space_cube(env.observation_space, numStates, [1,1,1,1])
     #print(discActions)
@@ -467,25 +481,30 @@ def main():
     # print(samples[0])
     numobs = len(samples[0][0])
     numact = len(samples[0][1])
-    numfeat = 200
+    numfeat = 100
     P = getP(numfeat, numobs + numact)
-    v = 10
+    v = 5
     phi = getphi(numfeat)
     fourierparams = [P, v, phi, numfeat]
-
+    #print(samples)
+    expand_angles(samples)
     theta = regression(samples, fourierparams)
 
     #for visualizing the regression
-    x = np.ones([3,len(samples)])
-    yp = np.ones([len(samples)])
+    x = np.ones([10,len(samples)])
+    yp = np.ones([2,len(samples)])
     for i in range(len(samples)):
        x[0][i] = samples[i][0][0]
+       if np.abs(x[0][i]) > 4:
+           print(x[0][i])
        x[1][i] = samples[i][0][1]
-       x[2][i] = samples[i][1][0]
-       yp[i] = np.dot(theta[0], fourier(x[...,i], P, v, phi, numfeat))
-    #plt.scatter(x[0], np.abs(samples[...,2] - yp))
-    plt.scatter(x[1], yp)
-    plt.scatter(x[1], samples[...,2] )
+       x[2][i] = samples[i][3][0]
+       x[3][i] = getNextState(samples[i][0], samples[i][1], theta, fourierparams, discStates)[0]
+       yp[0][i] = getReward(samples[i][0], samples[i][1], theta, fourierparams)
+       yp[1][i] = np.sqrt(np.sum(np.square(samples[i][3] - getNextState(samples[i][0], samples[i][1], theta, fourierparams, discStates))))
+    #plt.scatter(x[0], np.square(samples[...,2] - yp[0]))
+    #plt.scatter(x[0], yp)
+    plt.scatter(x[0], x[2])
     plt.show()
 
     # test1 = getReward(samples[0][0], samples[0][1], theta, fourierparams)
@@ -501,11 +520,13 @@ def main():
     #print(policy)
     #policy_iterator = policy.reshape(1,numStates * numStates * numStates)
     #plt.scatter(range(numStates * numStates * numStates), policy_iterator[0])
-    for trials in range(20):
+    validation = []
+    for trials in range(1000):
         obs=env.reset()
         reward = 0
         done = False
         while not done:
+            sample = [obs]
             #print("iteration:"+str(i))
             dis_obs=discretize_state(obs,discStates)
             index=[]
@@ -514,11 +535,26 @@ def main():
             #act=policy[index[0]][index[1]][index[2]]
             act=policy[tuple(index)]
             obs, rew, done,_ = env.step([act])
+            sample.append([act])
+            sample.append(rew)
+            sample.append(obs)
+            sample.append(getReward(sample[0], act, theta, fourierparams))
+            sample.append(getNextState(sample[0], act, theta, fourierparams, discStates))
+            validation.append(sample)
             reward += rew
             #print(""+str(i)+" : "+str(rew)+" -- "+str(obs[0])+" "+str(obs[1]))
             #env.render()
         print(reward)
 
+    x = np.ones([3,len(validation)])
+    yp = np.ones([len(validation)])
+    for i in range(len(validation)):
+       x[0][i] = validation[i][0][0]
+       x[1][i] = validation[i][0][1]
+       x[2][i] = validation[i][1][0]
+       yp[i] = np.square(validation[i][2] - validation[i][4])
+    plt.scatter(x[0], yp)
+    plt.show()
 
 # For automatic execution
 main()
