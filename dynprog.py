@@ -120,7 +120,7 @@ def explore(env, numSamples, actions, states):
     print("start explore")
     samples = []
     renderCount=15
-    render=True
+    render=False
     while len(samples) < numSamples:
         done = False
         discState = env.reset()
@@ -214,6 +214,7 @@ def featuremat(samples, numFeats, fourierparams):
 #                   ---[[discState, action, reward, nextDiscState]]
 # fourierparams:    contains P, v, phi and the desired number of fourier features
 def regression(samples, fourierparams):
+    print('Begin Regression')
     theta = []
     numfeat = fourierparams[3]
     features = featuremat(samples, numfeat, fourierparams)
@@ -232,7 +233,7 @@ def regression(samples, fourierparams):
     # print(theta_dyn.shape)
     # print(theta_dyn)
     theta.append(theta_dyn)
-    # print(theta)
+    print('Regression Finished')
     return theta
 
 
@@ -275,6 +276,7 @@ def getNextState(state, act, theta, fparams, states):
 def train_policy(states, actions, theta, fparams):
     # Setup value-function
     # length = No(all possible states)
+    print('Begin training policy')
     explicitStatesShape = ()
     for dim in range(states.shape[0]):
         explicitStatesShape += (states.shape[1],)
@@ -345,7 +347,7 @@ def train_policy(states, actions, theta, fparams):
         #                 maxDelta = max(maxDelta, np.abs(newValFun - valFun[i][j][k]))
         #                 valFun[i][j][k] = newValFun
 
-        while maxDelta > 0.1:
+        while maxDelta > 0.01:
             maxDelta = 0
             it = np.nditer(valFun, flags=['multi_index'])
             mulInd = 0
@@ -454,8 +456,8 @@ def main():
     # false for pendulum, true for qube
     qube = False
     env = makeEnv(qube)
-    numActions = 21
-    numStates = 33
+    numActions = 5
+    numStates = 51
     discActions = discretize_space_cube(env.action_space, numActions, [True])
     discStates = discretize_space_cube(env.observation_space, numStates, [1,1,1,1])
     #print(discActions)
@@ -465,7 +467,7 @@ def main():
     # print(samples[0])
     numobs = len(samples[0][0])
     numact = len(samples[0][1])
-    numfeat = 20
+    numfeat = 200
     P = getP(numfeat, numobs + numact)
     v = 10
     phi = getphi(numfeat)
@@ -473,15 +475,19 @@ def main():
 
     theta = regression(samples, fourierparams)
 
-    # for visualizing the regression
-    # x = np.ones([4,len(samples)])
-    # yp = np.ones([len(samples)])
-    # for i in range(len(samples)):
-    #    x[0][i] = samples[i][0][0]
-    #    x[1][i] = samples[i][0][1]
-    #    x[2][i] = samples[i][0][2]
-    #    x[3][i] = samples[i][1][0]
-    #    yp[i] = np.dot(theta[0], fourier(x[...,i], P, v, phi, numfeat))
+    #for visualizing the regression
+    x = np.ones([3,len(samples)])
+    yp = np.ones([len(samples)])
+    for i in range(len(samples)):
+       x[0][i] = samples[i][0][0]
+       x[1][i] = samples[i][0][1]
+       x[2][i] = samples[i][1][0]
+       yp[i] = np.dot(theta[0], fourier(x[...,i], P, v, phi, numfeat))
+    #plt.scatter(x[0], np.abs(samples[...,2] - yp))
+    plt.scatter(x[1], yp)
+    plt.scatter(x[1], samples[...,2] )
+    plt.show()
+
     # test1 = getReward(samples[0][0], samples[0][1], theta, fourierparams)
     # test2 = getNextState(samples[0][0], samples[0][1], theta, fourierparams, discStates)
     # print(test1)
@@ -495,26 +501,24 @@ def main():
     #print(policy)
     #policy_iterator = policy.reshape(1,numStates * numStates * numStates)
     #plt.scatter(range(numStates * numStates * numStates), policy_iterator[0])
-    # plt.scatter(x[0], np.abs(samples[...,2] - yp))
-    # plt.scatter(x[0], yp)
-    # plt.scatter(x[0], samples[...,2] )
-    #plt.show()
-    for trials in range(3):
+    for trials in range(20):
         obs=env.reset()
-        for i in range(300):
+        reward = 0
+        done = False
+        while not done:
             #print("iteration:"+str(i))
             dis_obs=discretize_state(obs,discStates)
             index=[]
             index+=[read_index_for_state(discStates,0,dis_obs[0])]
             index+=[read_index_for_state(discStates,1,dis_obs[1])]
-            #import pdb; pdb.set_trace()
             #act=policy[index[0]][index[1]][index[2]]
             act=policy[tuple(index)]
             obs, rew, done,_ = env.step([act])
-            print(""+str(i)+" : "+str(rew)+" -- "+str(obs[0])+" "+str(obs[1]))
-            env.render()
+            reward += rew
+            #print(""+str(i)+" : "+str(rew)+" -- "+str(obs[0])+" "+str(obs[1]))
+            #env.render()
+        print(reward)
 
-    import pdb; pdb.set_trace()
 
 # For automatic execution
 main()
