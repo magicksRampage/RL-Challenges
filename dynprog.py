@@ -79,8 +79,16 @@ def discretize_state(sample, space):
 def _discretize(sample, space):
     discSample = []
     positions = []
+    angle = False
     for i in range(len(sample)):
-        entry = np.clip(sample[i], space[i][0], space[i][-1])
+        if len(sample) > 1 and i == 0:
+            angle = True
+        else:
+            angle = False
+        if angle:
+            entry = castAngle(sample[i], space[i][0], space[i][-1])
+        else:
+            entry = np.clip(sample[i], space[i][0], space[i][-1])
         for j in range(len(space[i])):
             step = space[i][j]
             if entry == step:
@@ -98,30 +106,23 @@ def _discretize(sample, space):
                 break
     return [np.array(discSample), np.array(positions)]
 
+# loops input sample into the interval defined by low and high
+def castAngle(sample, low, high):
+    distance = high - low
+    while sample < low:
+        sample += distance
+    while sample > high:
+        sample -= distance
+    return sample
 
+# expands the interval for the angles in s' when they loop around
 def expand_angles(samples):
-    expandedSamples = samples
-    noReplaced = 0
-    for i in range(samples.shape[0]):
-        tempSample = samples[i]
-        toPrint = True
-        curStateAngle = tempSample[0][0]
-        newStateAngle = tempSample[3][0]
-        if(curStateAngle > 4.0) | (newStateAngle > 4.0):
-            print("Big Angles")
-            toPrint = True
+    for sample in samples:
+        curStateAngle = sample[0][0]
+        newStateAngle = sample[3][0]
         # print("old: " + str(curStateAngle) + ", new: " + str(newStateAngle))
-        if np.abs(curStateAngle - newStateAngle) > 5:
-            noReplaced += 1
-            if toPrint:
-                print("replacing: " + str(noReplaced) + " | " + str(i))
-                print("prior Angle: " + str(tempSample[0][0]) + " | " + str(tempSample[3][0]))
-                tempSample[3][0] = newStateAngle - (2 * np.pi * np.sign(newStateAngle))
-            if toPrint:
-                print("modified Angle: " + str(tempSample[0][0]) + " | " + str(tempSample[3][0]))
-                print("")
-        expandedSamples[i] = tempSample
-    return expandedSamples
+        if np.abs(curStateAngle - newStateAngle) > 4:
+            sample[3][0] = newStateAngle - (2 * np.pi * np.sign(newStateAngle))
 
 
 # gaussian exploration policy (for pendulum only)
@@ -164,7 +165,7 @@ def explore(env, numSamples, actions, states):
         # print("reset")
         discState = discretize_state(discState, states)
         while not done:
-            s = [discState]
+            s = [discState.copy()]
             a = discretize_state(exploration_policy(discState), actions)
             s.append(a)
             obs, reward, done, info = env.step(a)
@@ -172,7 +173,7 @@ def explore(env, numSamples, actions, states):
                 env.render()
             discState = discretize_state(obs, states)
             s.append(reward)
-            s.append(discState)
+            s.append(discState.copy())
             samples.append(s)
         if (renderCount > 0):
             renderCount -= 1
@@ -445,8 +446,8 @@ def main():
     # false for pendulum, true for qube
     qube = False
     env = makeEnv(qube)
-    numActions = 5
-    numStates = 21
+    numActions = 3
+    numStates = 51
     discActions = discretize_space_cube(env.action_space, numActions, [3])
     discStates = discretize_space_cube(env.observation_space, numStates, [2, 2, 2, 2])
     discCube = discretize_space_cube(env.observation_space, numStates, [3, 3, 3, 3])
@@ -461,13 +462,12 @@ def main():
     # print(samples[0])
     numobs = len(samples[0][0])
     numact = len(samples[0][1])
-    numfeat = 100
+    numfeat = 50
     P = getP(numfeat, numobs + numact)
     v = 5
     phi = getphi(numfeat)
     fourierparams = [P, v, phi, numfeat]
-    # print(samples)
-    samples = expand_angles(samples)
+    expand_angles(samples)
     theta = regression(samples, fourierparams)
 
     # for visualizing the regression
@@ -489,9 +489,9 @@ def main():
         # squared difference between estimated and actual next State
         yp[1][i] = np.sqrt(np.sum(
             np.square(samples[i][3] - getNextState(samples[i][0], samples[i][1], theta, fourierparams, discStates))))
-    # plt.scatter(x[0], np.square(samples[...,2] - yp[0]))
-    # plt.scatter(x[0], yp)
-    plt.scatter(x[0], x[2])
+    #plt.scatter(x[0], np.square(samples[...,2] - yp[0]))
+    #plt.scatter(x[0], yp[1])
+    plt.scatter(x[0], x[3])
     plt.show()
 
     # test1 = getReward(samples[0][0], samples[0][1], theta, fourierparams)
