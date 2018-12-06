@@ -40,6 +40,7 @@ def discretize_space(space, grain):
             discSpace[i][j] = lows[i] + j * step
     return discSpace
 
+
 # returns a uniform discrete space
 # space:    continuous space to be discretized
 # grain:    number of desired discrete classes for each dimension of the space
@@ -48,34 +49,36 @@ def discretize_space_cube(space, grain, cubed):
     shape = space.shape
     highs = space.high
     lows = space.low
-    discSpace = np.ones([shape[0],grain])
+    discSpace = np.ones([shape[0], grain])
     for i in range(shape[0]):
         step = (highs[i] - lows[i]) / (grain - 1)
         for j in range(grain):
             discSpace[i][j] = lows[i] + j * step
-        if (cubed[i]>1):
-            highest=highs[i]
-            if (abs(lows[i])>highest):
-                highest=lows[i]
-            if(cubed[i]==3):
-                discSpace[i]=(discSpace[i]**3)/(highest**2)
-            elif(cubed[i]==2):
-                vz=np.ones(len(discSpace[i]))#vorzeichen
+        if (cubed[i] > 1):
+            highest = highs[i]
+            if (abs(lows[i]) > highest):
+                highest = lows[i]
+            if (cubed[i] == 3):
+                discSpace[i] = (discSpace[i] ** 3) / (highest ** 2)
+            elif (cubed[i] == 2):
+                vz = np.ones(len(discSpace[i]))  # vorzeichen
                 for k in range(len(discSpace[i])):
-                    vz[k]=np.copysign(vz[k],discSpace[i][k])
-                discSpace[i]=vz*(discSpace[i]**2)/(highest)
+                    vz[k] = np.copysign(vz[k], discSpace[i][k])
+                discSpace[i] = vz * (discSpace[i] ** 2) / (highest)
 
     return discSpace
+
 
 # classifies a continuous sample for a discrete space
 # sample:   continuous sample to be discretized
 # space:    discrete space
 def discretize_state(sample, space):
-    return _discretize(sample,space)[0]
+    return _discretize(sample, space)[0]
 
-def _discretize(sample,space):
+
+def _discretize(sample, space):
     discSample = []
-    positions=[]
+    positions = []
     for i in range(len(sample)):
         entry = np.clip(sample[i], space[i][0], space[i][-1])
         for j in range(len(space[i])):
@@ -91,45 +94,58 @@ def _discretize(sample,space):
                     positions.append(j)
                 else:
                     discSample.append(prev)
-                    positions.append(j-1)
+                    positions.append(j - 1)
                 break
-    return [np.array(discSample),np.array(positions)]
+    return [np.array(discSample), np.array(positions)]
 
 
 def expand_angles(samples):
-    for sample in samples:
-        old_angle = sample[0][0]
-        new_angle = sample[3][0]
-        #print(sample)
-        #print("old: " + str(old_angle) + ", new: " + str(new_angle))
-        if np.abs(old_angle - new_angle) > 5:
-            #print("replacing")
-            if new_angle > 0:
-                sample[3][0] = new_angle - 2 * np.pi
-            else:
-                sample[3][0] = new_angle + 2 * np.pi
-            #print(sample)
+    expandedSamples = samples
+    noReplaced = 0
+    for i in range(samples.shape[0]):
+        tempSample = samples[i]
+        toPrint = True
+        curStateAngle = tempSample[0][0]
+        newStateAngle = tempSample[3][0]
+        if(curStateAngle > 4.0) | (newStateAngle > 4.0):
+            print("Big Angles")
+            toPrint = True
+        # print("old: " + str(curStateAngle) + ", new: " + str(newStateAngle))
+        if np.abs(curStateAngle - newStateAngle) > 5:
+            noReplaced += 1
+            if toPrint:
+                print("replacing: " + str(noReplaced) + " | " + str(i))
+                print("prior Angle: " + str(tempSample[0][0]) + " | " + str(tempSample[3][0]))
+                tempSample[3][0] = newStateAngle - (2 * np.pi * np.sign(newStateAngle))
+            if toPrint:
+                print("modified Angle: " + str(tempSample[0][0]) + " | " + str(tempSample[3][0]))
+                print("")
+        expandedSamples[i] = tempSample
+    return expandedSamples
+
 
 # gaussian exploration policy (for pendulum only)
 # obs:  current state
 def exploration_policy(obs):
-    zufall=rnd.gauss(0,1)
-    value=zufall
-    vel=obs[1]
-    #value=vel/8+zufall
-    if(obs[0]>1.57 or obs[0]<-1.57):
-    #    if(obs[0]<0.8):
-        sig=copysign(1.5,vel)
-        #value=copysign(2,vel)#+rnd.gauss(0,0.5)
-        value=rnd.gauss(sig,0.5)
+    zufall = rnd.gauss(0, 1)
+    value = zufall
+    vel = obs[1]
+    # value=vel/8+zufall
+    if (obs[0] > 1.57 or obs[0] < -1.57):
+        #    if(obs[0]<0.8):
+        sig = copysign(1.5, vel)
+        # value=copysign(2,vel)#+rnd.gauss(0,0.5)
+        value = rnd.gauss(sig, 0.5)
     else:
-        value=rnd.gauss(0,1)
-    #if (zufall<0):
+        value = rnd.gauss(0, 1)
+    # if (zufall<0):
     #    value=-1
-    #else:
+    # else:
     #    value=1
     return [min(2.0, max(-2.0, value))]
-#return [0]
+
+
+# return [0]
 
 
 # generate a number of samples for regression, using an exploration policy
@@ -140,28 +156,28 @@ def exploration_policy(obs):
 def explore(env, numSamples, actions, states):
     print("start explore")
     samples = []
-    renderCount=15
-    render=False
+    renderCount = 15
+    render = False
     while len(samples) < numSamples:
         done = False
         discState = env.reset()
-        #print("reset")
+        # print("reset")
         discState = discretize_state(discState, states)
         while not done:
             s = [discState]
             a = discretize_state(exploration_policy(discState), actions)
             s.append(a)
             obs, reward, done, info = env.step(a)
-            if(render):
+            if (render):
                 env.render()
             discState = discretize_state(obs, states)
             s.append(reward)
             s.append(discState)
             samples.append(s)
-        if(renderCount>0):
-            renderCount-=1
-            if renderCount==0:
-                render=False
+        if (renderCount > 0):
+            renderCount -= 1
+            if renderCount == 0:
+                render = False
 
     print("end explore")
     return np.array(samples)
@@ -323,19 +339,6 @@ def train_policy(states, actions, theta, fparams):
         # policy evaluation
         maxDelta = 1
 
-        # for i in range(valFun.shape[0]):
-        #     for j in range(valFun.shape[1]):
-        #         for k in range(valFun.shape[2]):
-        #             if np.isinf(policy[i][j][k]):
-        #                 imReward[i][j][k] = 0
-        #                 for act in range(len(actions[0])):
-        #                     imReward[i][j][k] += getReward((states[0][i], states[1][j], states[2][k]), actions[0][act], theta, fparams)/len(actions[0])
-        #                 transFun[i][j][k] = getNextState((states[0][i], states[1][j], states[2][k]), np.random.choice(actions[0]), theta, fparams, states)
-        #
-        #             else:
-        #                 imReward[i][j][k] = getReward((states[0][i], states[1][j], states[2][k]), policy[i][j][k], theta, fparams)
-        #                 transFun[i][j][k] = getNextState((states[0][i], states[1][j], states[2][k]), policy[i][j][k], theta, fparams, states)
-
         it = np.nditer(valFun, flags=['multi_index'])
         tempReward = 0
         tempState = ()
@@ -358,16 +361,6 @@ def train_policy(states, actions, theta, fparams):
                 transFun[mulInd] = getNextState(tempState, policy.item(mulInd), theta, fparams, states)
             it.iternext()
 
-        # while maxDelta > 0.1:
-        #     maxDelta = 0
-        #     for i in range(valFun.shape[0]):
-        #         for j in range(valFun.shape[1]):
-        #             for k in range(valFun.shape[2]):
-        #
-        #                 newValFun = imReward[i][j][k] + gamma*valFun[read_index_for_state(states, 0, transFun[i][j][k][0])][read_index_for_state(states, 1, transFun[i][j][k][1])][read_index_for_state(states, 2, transFun[i][j][k][2])]
-        #                 maxDelta = max(maxDelta, np.abs(newValFun - valFun[i][j][k]))
-        #                 valFun[i][j][k] = newValFun
-
         while maxDelta > 0.01:
             maxDelta = 0
             it = np.nditer(valFun, flags=['multi_index'])
@@ -385,31 +378,6 @@ def train_policy(states, actions, theta, fparams):
                 tempStateInd = ()
                 it.iternext()
 
-        # greedy policy improvement
-        # bestTorque = 0
-        # tempReward = -np.inf
-        # bestReward = -np.inf
-        # tempState = np.array((0., 0., 0.))
-        # for i in range(valFun.shape[0]):
-        #     for j in range(valFun.shape[1]):
-        #         for k in range(valFun.shape[2]):
-        #             bestReward = -np.inf
-        #             for act in actions[0]:
-        #                 tempState = getNextState((states[0][i], states[1][j], states[2][k]), act, theta, fparams,
-        #                                          states)
-        #                 tempReward = gamma * valFun[read_index_for_state(states, 0, tempState[0])][
-        #                     read_index_for_state(states, 1, tempState[1])][
-        #                     read_index_for_state(states, 2, tempState[2])]
-        #                 tempReward += getReward((states[0][i], states[1][j], states[2][k]), act, theta, fparams)
-        #                 if tempReward > bestReward:
-        #                     bestTorque = act
-        #                     bestReward = tempReward
-        #             stable = policy[i][j][k] == bestTorque
-        #             if not stable:
-        #                 policyStable = False
-        #             policy[i][j][k] = bestTorque
-        #             bestTorque = 0
-
         it = np.nditer(valFun, flags=['multi_index'])
         bestTorque = 0
         tempReward = -np.inf
@@ -425,8 +393,8 @@ def train_policy(states, actions, theta, fparams):
             for act in actions[0]:
                 nextState = getNextState(prevState, act, theta, fparams, states)
                 for dim in range(len(mulInd)):
-                    nextStateInd += (read_index_for_state(states, dim, nextState[dim]), )
-                tempReward = getReward(prevState, act, theta,fparams) + gamma * valFun [nextStateInd]
+                    nextStateInd += (read_index_for_state(states, dim, nextState[dim]),)
+                tempReward = getReward(prevState, act, theta, fparams) + gamma * valFun[nextStateInd]
                 if tempReward > bestReward:
                     bestTorque = act
                     bestReward = tempReward
@@ -442,7 +410,7 @@ def train_policy(states, actions, theta, fparams):
             prevState = ()
             it.iternext()
 
-        print("update:"+str(updates))
+        print("update:" + str(updates))
         updates += 1
 
     print("updates: " + str(updates))
@@ -455,39 +423,39 @@ def train_policy(states, actions, theta, fparams):
 # dimension:    state dimension in which the value is to be found
 # stateVal:     the Value for which to find the index
 def read_index_for_state(states, dimension, stateVal):
-    #import pdb; pdb.set_trace()
-    #TODO @Tim unser Code soll schoener werden
-    if(dimension==1):
-        return _discretize([0,stateVal],states)[1][dimension]
-    if(dimension==2):
-        return _discretize([0,0,stateVal],states)[1][dimension]
-    if(dimension==3):
-        return _discretize([0,0,0,stateVal],states)[1][dimension]
-    return _discretize([stateVal],states)[1][dimension]
-    #dimLen = len(states[dimension])
-    #dimMax = states[dimension][-1]
-    #dimMin = states[dimension][0]
-    #step = (dimMax - dimMin) / (dimLen - 1)
-    #index = (stateVal - dimMin) / step
-    #return int(round(max(dimMin, min(dimMax, index))))
+    # import pdb; pdb.set_trace()
+    # TODO @Tim unser Code soll schoener werden
+    if (dimension == 1):
+        return _discretize([0, stateVal], states)[1][dimension]
+    if (dimension == 2):
+        return _discretize([0, 0, stateVal], states)[1][dimension]
+    if (dimension == 3):
+        return _discretize([0, 0, 0, stateVal], states)[1][dimension]
+    return _discretize([stateVal], states)[1][dimension]
+    # dimLen = len(states[dimension])
+    # dimMax = states[dimension][-1]
+    # dimMin = states[dimension][0]
+    # step = (dimMax - dimMin) / (dimLen - 1)
+    # index = (stateVal - dimMin) / step
+    # return int(round(max(dimMin, min(dimMax, index))))
 
-
+#samples:       [state, action, reward, next state]
 def main():
-    t1=clock()
+    t1 = clock()
     # false for pendulum, true for qube
     qube = False
     env = makeEnv(qube)
     numActions = 5
     numStates = 21
     discActions = discretize_space_cube(env.action_space, numActions, [3])
-    discStates = discretize_space_cube(env.observation_space, numStates, [2,2,2,2])
-    discCube=discretize_space_cube(env.observation_space,numStates,[3,3,3,3])
-    plot_discretisation(
-                    [np.sin(discStates[0]),np.sin(discCube[0])],
-                    [np.cos(discStates[0]),np.cos(discCube[0])],['o','.'])
-    #plt.show()
-    #print(discActions)
-    #print(discStates)
+    discStates = discretize_space_cube(env.observation_space, numStates, [2, 2, 2, 2])
+    discCube = discretize_space_cube(env.observation_space, numStates, [3, 3, 3, 3])
+    # plot_discretisation(
+    #     [np.sin(discStates[0]), np.sin(discCube[0])],
+    #     [np.cos(discStates[0]), np.cos(discCube[0])], ['o', '.'])
+    # plt.show()
+    # print(discActions)
+    # print(discStates)
     samples = explore(env, 10000, discActions, discStates)
     # print(len(samples))
     # print(samples[0])
@@ -498,24 +466,31 @@ def main():
     v = 5
     phi = getphi(numfeat)
     fourierparams = [P, v, phi, numfeat]
-    #print(samples)
-    expand_angles(samples)
+    # print(samples)
+    samples = expand_angles(samples)
     theta = regression(samples, fourierparams)
 
-    #for visualizing the regression
-    x = np.ones([10,len(samples)])
-    yp = np.ones([2,len(samples)])
+    # for visualizing the regression
+    x = np.ones([10, len(samples)])
+    yp = np.ones([2, len(samples)])
     for i in range(len(samples)):
-       x[0][i] = samples[i][0][0]
-       if np.abs(x[0][i]) > 4:
-           print(x[0][i])
-       x[1][i] = samples[i][0][1]
-       x[2][i] = samples[i][3][0]
-       x[3][i] = getNextState(samples[i][0], samples[i][1], theta, fourierparams, discStates)[0]
-       yp[0][i] = getReward(samples[i][0], samples[i][1], theta, fourierparams)
-       yp[1][i] = np.sqrt(np.sum(np.square(samples[i][3] - getNextState(samples[i][0], samples[i][1], theta, fourierparams, discStates))))
-    #plt.scatter(x[0], np.square(samples[...,2] - yp[0]))
-    #plt.scatter(x[0], yp)
+        # angle
+        x[0][i] = samples[i][0][0]
+        # if np.abs(x[0][i]) > 4:
+        #     print(x[0][i])
+        # angular velocity
+        x[1][i] = samples[i][0][1]
+        # true next angle
+        x[2][i] = samples[i][3][0]
+        # estimated next angle
+        x[3][i] = getNextState(samples[i][0], samples[i][1], theta, fourierparams, discStates)[0]
+        # estimated Reward
+        yp[0][i] = getReward(samples[i][0], samples[i][1], theta, fourierparams)
+        # squared difference between estimated and actual next State
+        yp[1][i] = np.sqrt(np.sum(
+            np.square(samples[i][3] - getNextState(samples[i][0], samples[i][1], theta, fourierparams, discStates))))
+    # plt.scatter(x[0], np.square(samples[...,2] - yp[0]))
+    # plt.scatter(x[0], yp)
     plt.scatter(x[0], x[2])
     plt.show()
 
@@ -527,26 +502,26 @@ def main():
     policy = train_policy(discStates, discActions, theta, fourierparams)
 
     print('Its over')
-    t2=clock()
-    print("Rechenzeit = " + str(t2-t1))
-    #print(policy)
-    #policy_iterator = policy.reshape(1,numStates * numStates * numStates)
-    #plt.scatter(range(numStates * numStates * numStates), policy_iterator[0])
+    t2 = clock()
+    print("Rechenzeit = " + str(t2 - t1))
+    # print(policy)
+    # policy_iterator = policy.reshape(1,numStates * numStates * numStates)
+    # plt.scatter(range(numStates * numStates * numStates), policy_iterator[0])
     validation = []
     for trials in range(1000):
-        obs=env.reset()
+        obs = env.reset()
         reward = 0
         done = False
         while not done:
             sample = [obs]
-            #print("iteration:"+str(i))
-            dis_obs=discretize_state(obs,discStates)
-            index=[]
-            index+=[read_index_for_state(discStates,0,dis_obs[0])]
-            index+=[read_index_for_state(discStates,1,dis_obs[1])]
-            #act=policy[index[0]][index[1]][index[2]]
-            act=policy[tuple(index)]
-            obs, rew, done,_ = env.step([act])
+            # print("iteration:"+str(i))
+            dis_obs = discretize_state(obs, discStates)
+            index = []
+            index += [read_index_for_state(discStates, 0, dis_obs[0])]
+            index += [read_index_for_state(discStates, 1, dis_obs[1])]
+            # act=policy[index[0]][index[1]][index[2]]
+            act = policy[tuple(index)]
+            obs, rew, done, _ = env.step([act])
             sample.append([act])
             sample.append(rew)
             sample.append(obs)
@@ -554,29 +529,31 @@ def main():
             sample.append(getNextState(sample[0], act, theta, fourierparams, discStates))
             validation.append(sample)
             reward += rew
-            #print(""+str(i)+" : "+str(rew)+" -- "+str(obs[0])+" "+str(obs[1]))
-            #env.render()
+            # print(""+str(i)+" : "+str(rew)+" -- "+str(obs[0])+" "+str(obs[1]))
+            # env.render()
         print(reward)
 
-    x = np.ones([3,len(validation)])
+    x = np.ones([3, len(validation)])
     yp = np.ones([len(validation)])
     for i in range(len(validation)):
-       x[0][i] = validation[i][0][0]
-       x[1][i] = validation[i][0][1]
-       x[2][i] = validation[i][1][0]
-       yp[i] = np.square(validation[i][2] - validation[i][4])
+        x[0][i] = validation[i][0][0]
+        x[1][i] = validation[i][0][1]
+        x[2][i] = validation[i][1][0]
+        yp[i] = np.square(validation[i][2] - validation[i][4])
     plt.scatter(x[0], yp)
     plt.show()
 
-def plot_discretisation(x,y,opt):
-    l=len(x)
-    if len(y)<l:
-        l=len(y)
-    fig,ax=plt.subplots()
+
+def plot_discretisation(x, y, opt):
+    l = len(x)
+    if len(y) < l:
+        l = len(y)
+    fig, ax = plt.subplots()
     for i in range(l):
-        ax.plot(x[i],y[i],opt[i])
+        ax.plot(x[i], y[i], opt[i])
     ax.set_aspect('equal')
-    #plt.show()
+    # plt.show()
+
 
 # For automatic execution
 main()
