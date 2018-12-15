@@ -5,6 +5,7 @@ import random as rnd
 import matplotlib.pyplot as plt
 from time import *
 from math import *
+from Discretization import Discretization
 
 
 # dynamic programming algorithm
@@ -25,95 +26,35 @@ def makeEnv(whichEnv):
         return gym.make('Pendulum-v2')
 
 
-# returns a uniform discrete space
-# space:    continuous space to be discretized
-# grain:    number of desired discrete classes for each dimension of the space
-#           TODO: length of disc. space is 1 longer then indicated by grains
+
+# 'discretize_space' deprecated.
+# use 'Discretization.getSpace' instead.
 def discretize_space(space, grain):
-    shape = space.shape
-    highs = space.high
-    lows = space.low
-    discSpace = np.ones([shape[0], grain])
-    for i in range(shape[0]):
-        step = (highs[i] - lows[i]) / (grain - 1)
-        for j in range(grain):
-            discSpace[i][j] = lows[i] + j * step
-    return discSpace
+    print("deprecated warning: use 'Discretization.getSpace' instead.")
+    return Discretization.getSpace(space, grain)
 
 
-# returns a uniform discrete space
-# space:    continuous space to be discretized
-# grain:    number of desired discrete classes for each dimension of the space
-# exponent: [0,1,sonstiges]=linear;  2=squared;  3=cubed
+# 'discretize_space_cube' deprecated.
+# use Discretization.getSpace_extended instead.
 def discretize_space_cube(space, grain, cubed):
-    shape = space.shape
-    highs = space.high
-    lows = space.low
-    discSpace = np.ones([shape[0], grain])
-    for i in range(shape[0]):
-        step = (highs[i] - lows[i]) / (grain - 1)
-        for j in range(grain):
-            discSpace[i][j] = lows[i] + j * step
-        if (cubed[i] > 1):
-            highest = highs[i]
-            if (abs(lows[i]) > highest):
-                highest = lows[i]
-            if (cubed[i] == 3):
-                discSpace[i] = (discSpace[i] ** 3) / (highest ** 2)
-            elif (cubed[i] == 2):
-                vz = np.ones(len(discSpace[i]))  # vorzeichen
-                for k in range(len(discSpace[i])):
-                    vz[k] = np.copysign(vz[k], discSpace[i][k])
-                discSpace[i] = vz * (discSpace[i] ** 2) / (highest)
-
-    return discSpace
+    print("deprecated warning: use Discretization.getSpace_extended instead.")
+    return Discretization.getSpace_extended(space, grain, cubed)
 
 
-# classifies a continuous sample for a discrete space
-# sample:   continuous sample to be discretized
-# space:    discrete space
-def discretize_state(sample, space):
-    return _discretize(sample, space)[0]
+# 'discretize_state(sample,space)' deprecated.
+# use 'Discretization.getState(sample,space)' instead.
+def discretize_state(sample,space):
+    print("deprecated warning: use 'Discretization.getState(sample,space)' instead.")
+    return Discretization.getState(sample, space)
 
 
-def _discretize(sample, space):
-    discSample = []
-    positions = []
-    angle = False
-    for i in range(len(sample)):
-        if len(sample) > 1 and i == 0:
-            angle = True
-        else:
-            angle = False
-        if angle:
-            entry = castAngle(sample[i], space[i][0], space[i][-1])
-        else:
-            entry = np.clip(sample[i], space[i][0], space[i][-1])
-        for j in range(len(space[i])):
-            step = space[i][j]
-            if entry == step:
-                discSample.append(step)
-                positions.append(j)
-                break
-            elif entry < step:
-                prev = space[i][j - 1]
-                if np.abs(entry - prev) > np.abs(entry - step):
-                    discSample.append(step)
-                    positions.append(j)
-                else:
-                    discSample.append(prev)
-                    positions.append(j - 1)
-                break
-    return [np.array(discSample), np.array(positions)]
+# 'read_index_for_state' deprecated.
+# use 'Discretization.getIndex(states,dimension.stateVal)' instead.
+def read_index_for_state(states, dimension, stateVal):
+    print("deprecated warning: use 'Discretization.getIndex(states,dimension.stateVal)' instead.")
+    return Discretization.getIndex(states, dimension, stateVal)
 
-# loops input sample into the interval defined by low and high
-def castAngle(sample, low, high):
-    distance = high - low
-    while sample < low:
-        sample += distance
-    while sample > high:
-        sample -= distance
-    return sample
+
 
 # expands the interval for the angles in s' when they loop around
 def expand_angles(samples):
@@ -127,7 +68,10 @@ def expand_angles(samples):
 
 # gaussian exploration policy (for pendulum only)
 # obs:  current state
-def exploration_policy(obs):
+def exploration_policy(obs,cube):
+    if cube:
+        zufall = rnd.gauss(0, 10)
+        return zufall
     zufall = rnd.gauss(0, 1)
     value = zufall
     vel = obs[1]
@@ -159,19 +103,20 @@ def explore(env, numSamples, actions, states):
     samples = []
     renderCount = 15
     render = False
+    cube=(str(env)==str("<TimeLimit<Qube<Qube-v0>>>"))
     while len(samples) < numSamples:
         done = False
         discState = env.reset()
         # print("reset")
-        discState = discretize_state(discState, states)
+        discState = Discretization.getState(discState, states)
         while not done:
             s = [discState.copy()]
-            a = discretize_state(exploration_policy(discState), actions)
+            a = Discretization.getState(exploration_policy(discState,cube), actions)
             s.append(a)
             obs, reward, done, info = env.step(a)
             if (render):
                 env.render()
-            discState = discretize_state(obs, states)
+            discState = Discretization.getState(obs, states)
             s.append(reward)
             s.append(discState.copy())
             samples.append(s)
@@ -303,7 +248,7 @@ def getNextState(state, act, theta, fparams, states):
     for i in range(len(state)):
         newState.append(np.dot(theta_s[..., i], fx))
     # print(newState)
-    return discretize_state(np.array(newState), states)
+    return Discretization.getState(np.array(newState), states)
 
 
 # Planes the optimal policy for a MDP defined by:
@@ -335,6 +280,7 @@ def train_policy(states, actions, theta, fparams):
     policyStable = False
     # while udates < 10:
     while not policyStable:
+        print("update:" + str(updates))
         policyStable = True
         oldPolicy = policy
         # policy evaluation
@@ -370,7 +316,7 @@ def train_policy(states, actions, theta, fparams):
             while not it.finished:
                 mulInd = it.multi_index
                 for dim in range(len(mulInd)):
-                    tempStateInd += (read_index_for_state(states, dim, transFun.item(mulInd + (dim,))),)
+                    tempStateInd += (Discretization.getIndex(states, dim, transFun.item(mulInd + (dim,))),)
 
                 newValfun = imReward.item(mulInd) + gamma * valFun.item(tempStateInd)
                 maxDelta = max(maxDelta, np.abs(newValfun - valFun.item(mulInd)))
@@ -394,7 +340,7 @@ def train_policy(states, actions, theta, fparams):
             for act in actions[0]:
                 nextState = getNextState(prevState, act, theta, fparams, states)
                 for dim in range(len(mulInd)):
-                    nextStateInd += (read_index_for_state(states, dim, nextState[dim]),)
+                    nextStateInd += (Discretization.getIndex(states, dim, nextState[dim]),)
                 tempReward = getReward(prevState, act, theta, fparams) + gamma * valFun[nextStateInd]
                 if tempReward > bestReward:
                     bestTorque = act
@@ -411,7 +357,6 @@ def train_policy(states, actions, theta, fparams):
             prevState = ()
             it.iternext()
 
-        print("update:" + str(updates))
         updates += 1
 
     print("updates: " + str(updates))
@@ -419,26 +364,6 @@ def train_policy(states, actions, theta, fparams):
     return policy
 
 
-# Finds the index of a given stateValue in its discretized Space
-# states:       discretized state space
-# dimension:    state dimension in which the value is to be found
-# stateVal:     the Value for which to find the index
-def read_index_for_state(states, dimension, stateVal):
-    # import pdb; pdb.set_trace()
-    # TODO @Tim unser Code soll schoener werden
-    if (dimension == 1):
-        return _discretize([0, stateVal], states)[1][dimension]
-    if (dimension == 2):
-        return _discretize([0, 0, stateVal], states)[1][dimension]
-    if (dimension == 3):
-        return _discretize([0, 0, 0, stateVal], states)[1][dimension]
-    return _discretize([stateVal], states)[1][dimension]
-    # dimLen = len(states[dimension])
-    # dimMax = states[dimension][-1]
-    # dimMin = states[dimension][0]
-    # step = (dimMax - dimMin) / (dimLen - 1)
-    # index = (stateVal - dimMin) / step
-    # return int(round(max(dimMin, min(dimMax, index))))
 
 #samples:       [state, action, reward, next state]
 def main():
@@ -448,9 +373,9 @@ def main():
     env = makeEnv(qube)
     numActions = 3
     numStates = 51
-    discActions = discretize_space_cube(env.action_space, numActions, [3])
-    discStates = discretize_space_cube(env.observation_space, numStates, [2, 2, 2, 2])
-    discCube = discretize_space_cube(env.observation_space, numStates, [3, 3, 3, 3])
+    discActions = Discretization.getSpace_extended(env.action_space, numActions, [3])
+    discStates = Discretization.getSpace_extended(env.observation_space, numStates, [2, 2, 2, 2])
+    # discCube = discretize_space_cube(env.observation_space, numStates, [3, 3, 3, 3])
     # plot_discretisation(
     #     [np.sin(discStates[0]), np.sin(discCube[0])],
     #     [np.cos(discStates[0]), np.cos(discCube[0])], ['o', '.'])
@@ -492,7 +417,7 @@ def main():
     #plt.scatter(x[0], np.square(samples[...,2] - yp[0]))
     #plt.scatter(x[0], yp[1])
     plt.scatter(x[0], x[3])
-    plt.show()
+    #plt.show()
 
     # test1 = getReward(samples[0][0], samples[0][1], theta, fourierparams)
     # test2 = getNextState(samples[0][0], samples[0][1], theta, fourierparams, discStates)
@@ -508,17 +433,19 @@ def main():
     # policy_iterator = policy.reshape(1,numStates * numStates * numStates)
     # plt.scatter(range(numStates * numStates * numStates), policy_iterator[0])
     validation = []
-    for trials in range(1000):
+    fig,ax=plt.subplots()
+    plt.show()#stop zum anschauen
+    for trials in range(10):
         obs = env.reset()
         reward = 0
         done = False
         while not done:
             sample = [obs]
             # print("iteration:"+str(i))
-            dis_obs = discretize_state(obs, discStates)
+            dis_obs = Discretization.getState(obs, discStates)
             index = []
-            index += [read_index_for_state(discStates, 0, dis_obs[0])]
-            index += [read_index_for_state(discStates, 1, dis_obs[1])]
+            index += [Discretization.getIndex(discStates, 0, dis_obs[0])]
+            index += [Discretization.getIndex(discStates, 1, dis_obs[1])]
             # act=policy[index[0]][index[1]][index[2]]
             act = policy[tuple(index)]
             obs, rew, done, _ = env.step([act])
@@ -530,7 +457,7 @@ def main():
             validation.append(sample)
             reward += rew
             # print(""+str(i)+" : "+str(rew)+" -- "+str(obs[0])+" "+str(obs[1]))
-            # env.render()
+            env.render()
         print(reward)
 
     x = np.ones([3, len(validation)])
