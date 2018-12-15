@@ -373,8 +373,8 @@ def main():
     env = makeEnv(qube)
     numActions = 5
     numStates = 51
-    discActions = Discretization.getSpace_extended(env.action_space, numActions, [3])
-    discStates = Discretization.getSpace_extended(env.observation_space, numStates, [2, 2, 2, 2])
+    discActions = Discretization.getSpace_extended(env.action_space, numActions, 3)
+    discStates = Discretization.getSpace_extended(env.observation_space, numStates, 2)
     # discCube = Discretization.getSpace_extended(env.observation_space, numStates, [3, 3, 3, 3])
     # Discretisation.plot(
     #     [np.sin(discStates[0]), np.sin(discCube[0])],
@@ -474,4 +474,4 @@ def main():
 
 
 # For automatic execution
-main()
+#main()

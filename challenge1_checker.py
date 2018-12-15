@@ -8,7 +8,7 @@ from gym.wrappers.monitor import Monitor
 from challenge1_template import get_model, get_policy
 
 # 1. Learn the model f: s, a -> s', r
-env = Monitor(gym.make('Pendulum-v0'), 'training', video_callable=False)
+env = Monitor(gym.make('Pendulum-v0'), 'training', video_callable=False, force=True)
 env.seed(98251624)
 max_num_samples = 10000
 model = get_model(env, max_num_samples)

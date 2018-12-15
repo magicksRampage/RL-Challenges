@@ -7,7 +7,6 @@ class Discretization:
     # returns a uniform discrete space
     # space:    continuous space to be discretized
     # grain:    number of desired discrete classes for each dimension of the space
-    #           TODO: length of disc. space is 1 longer then indicated by grains
     # formerly 'discretize_space'
     def getSpace(space, grain):
         shape = space.shape
@@ -34,13 +33,13 @@ class Discretization:
             step = (highs[i] - lows[i]) / (grain - 1)
             for j in range(grain):
                 discSpace[i][j] = lows[i] + j * step
-        if (exponent[i] > 1):
+        if (exponent > 1):
             highest = highs[i]
             if (abs(lows[i]) > highest):
                 highest = lows[i]
-            if (exponent[i] == 3):
+            if (exponent == 3):
                 discSpace[i] = (discSpace[i] ** 3) / (highest ** 2)
-            elif (exponent[i] == 2):
+            elif (exponent == 2):
                 vz = np.ones(len(discSpace[i]))  # vorzeichen
                 for k in range(len(discSpace[i])):
                     vz[k] = np.copysign(vz[k], discSpace[i][k])
@@ -61,10 +60,10 @@ class Discretization:
         positions = []
         angle = False
         for i in range(len(sample)):
-            if len(sample) > 1 and i == 0:
-                angle = True
-            else:
-                angle = False
+            #if len(sample) > 1 and i == 0:
+            #    angle = True
+            #else:
+            angle = False
             if angle:
                 entry = Discretization._castAngle(sample[i], space[i][0], space[i][-1])
             else:

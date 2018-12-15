@@ -1,3 +1,5 @@
+from dynprog import *
+
 """
 Submission template for Programming Challenge 1: Dynamic Programming.
 """
@@ -20,7 +22,24 @@ def get_model(env, max_num_samples):
     :param max_num_samples: maximum number of calls to env.step(a)
     :return: function f: s, a -> s', r
     """
-    return lambda obs, act: (2*obs + act, obs@obs + act**2)
+    t1 = clock()
+    numActions = 5
+    numStates = 51
+    discActions = Discretization.getSpace_extended(env.action_space, numActions, [3])
+    discStates = Discretization.getSpace_extended(env.observation_space, numStates, [2, 2, 2, 2])
+    samples = explore(env, max_num_samples, discActions, discStates)
+    numobs = len(samples[0][0])
+    numact = len(samples[0][1])
+    numfeat = 50
+    P = getP(numfeat, numobs + numact)
+    v = 5
+    phi = getphi(numfeat)
+    fourierparams = [P, v, phi, numfeat]
+    #expand_angles(samples)
+    theta = regression(samples, fourierparams)
+
+    
+    return lambda obs, act: (getNextState(obs, act, theta, fourierparams, discStates ), getReward(obs, act, theta, fourierparams))
 
 
 def get_policy(model, observation_space, action_space):
