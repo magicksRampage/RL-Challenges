@@ -22,7 +22,7 @@ nobs_pred, rwd_pred = model(obs, act)
 print(f'truth = {nobs, rwd}\nmodel = {nobs_pred, rwd_pred}')
 
 # 2. Perform dynamic programming using the learned model
-env = Monitor(gym.make('Pendulum-v0'), 'evaluation')
+env = Monitor(gym.make('Pendulum-v0'), 'evaluation', force=True)
 env.seed(31186490)
 policy = get_policy(model, env.observation_space, env.action_space)
 

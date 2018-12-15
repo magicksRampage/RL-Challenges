@@ -1,3 +1,5 @@
+from typing import Tuple
+
 from dynprog import *
 
 """
@@ -22,15 +24,15 @@ def get_model(env, max_num_samples):
     :param max_num_samples: maximum number of calls to env.step(a)
     :return: function f: s, a -> s', r
     """
-    t1 = clock()
+
     numActions = 5
-    numStates = 51
-    discActions = Discretization.getSpace_extended(env.action_space, numActions, [3])
-    discStates = Discretization.getSpace_extended(env.observation_space, numStates, [2, 2, 2, 2])
+    numStates = 25
+    discActions = Discretization.getSpace_extended(env.action_space, numActions, 3)
+    discStates = Discretization.getSpace_extended(env.observation_space, numStates, 2)
     samples = explore(env, max_num_samples, discActions, discStates)
     numobs = len(samples[0][0])
     numact = len(samples[0][1])
-    numfeat = 50
+    numfeat = 20
     P = getP(numfeat, numobs + numact)
     v = 5
     phi = getphi(numfeat)
@@ -51,6 +53,17 @@ def get_policy(model, observation_space, action_space):
     :param action_space: gym.Space
     :return: function pi: s -> a
     """
+    numActions = 5
+    numStates = 25
+    discActions = Discretization.getSpace_extended(action_space, numActions, 3)
+    discStates = Discretization.getSpace_extended(observation_space, numStates, 2)
 
+    policy = new_train_policy(model, discStates, discStates)
 
-    return lambda obs: action_space.high
+    def return_fun(obs):
+        mulInd = ()
+        for dim in range(len(obs)):
+            mulInd += (Discretization.getIndex(discStates, dim, obs[dim]),)
+        return policy(mulInd)
+
+    return lambda obs: return_fun(obs)
