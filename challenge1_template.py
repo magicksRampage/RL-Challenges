@@ -51,4 +51,6 @@ def get_policy(model, observation_space, action_space):
     :param action_space: gym.Space
     :return: function pi: s -> a
     """
+
+
     return lambda obs: action_space.high

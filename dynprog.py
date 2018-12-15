@@ -364,6 +364,21 @@ def train_policy(states, actions, theta, fparams):
     return policy
 
 
+def new_train_policy(model, observation_space, action_space):
+    """
+
+    :param model: function f: s, a -> s', r
+    :param observation_space: gym.Space
+    :param action_space: gym.Space
+    :return:
+    """
+
+    numActions = 5
+    numStates = 51
+    discActions = Discretization.getSpace_extended(action_space, numActions, [3])
+    discStates = Discretization.getSpace_extended(observation_space, numStates, [2, 2, 2, 2])
+    return 0
+
 
 #samples:       [state, action, reward, next state]
 def main():
