@@ -116,3 +116,13 @@ class Discretization:
         while sample > high:
             sample -= distance
         return sample
+
+    def plot(x, y, opt):
+        l = len(x)
+        if len(y) < l:
+            l = len(y)
+        fig, ax = plt.subplots()
+        for i in range(l):
+            ax.plot(x[i], y[i], opt[i])
+        ax.set_aspect('equal')
+        # plt.show()

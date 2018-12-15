@@ -375,8 +375,8 @@ def main():
     numStates = 51
     discActions = Discretization.getSpace_extended(env.action_space, numActions, [3])
     discStates = Discretization.getSpace_extended(env.observation_space, numStates, [2, 2, 2, 2])
-    # discCube = discretize_space_cube(env.observation_space, numStates, [3, 3, 3, 3])
-    # plot_discretisation(
+    # discCube = Discretization.getSpace_extended(env.observation_space, numStates, [3, 3, 3, 3])
+    # Discretisation.plot(
     #     [np.sin(discStates[0]), np.sin(discCube[0])],
     #     [np.cos(discStates[0]), np.cos(discCube[0])], ['o', '.'])
     # plt.show()
@@ -471,15 +471,6 @@ def main():
     plt.show()
 
 
-def plot_discretisation(x, y, opt):
-    l = len(x)
-    if len(y) < l:
-        l = len(y)
-    fig, ax = plt.subplots()
-    for i in range(l):
-        ax.plot(x[i], y[i], opt[i])
-    ax.set_aspect('equal')
-    # plt.show()
 
 
 # For automatic execution
