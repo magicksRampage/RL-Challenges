@@ -274,7 +274,7 @@ def train_policy(states, actions, theta, fparams):
     valFun = np.zeros(explicitStatesShape)
     updates = 0
     # polTorque = 0
-    gamma = 0.99
+    gamma = 0.9
     transFun = np.zeros(explicitStatesShape + (states.shape[0],))
     imReward = np.zeros(explicitStatesShape)
     policyStable = False
@@ -371,7 +371,7 @@ def main():
     # false for pendulum, true for qube
     qube = False
     env = makeEnv(qube)
-    numActions = 3
+    numActions = 5
     numStates = 51
     discActions = Discretization.getSpace_extended(env.action_space, numActions, [3])
     discStates = Discretization.getSpace_extended(env.observation_space, numStates, [2, 2, 2, 2])
