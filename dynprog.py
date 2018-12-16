@@ -48,14 +48,6 @@ def discretize_state(sample,space):
     return Discretization.getState(sample, space)
 
 
-# 'read_index_for_state' deprecated.
-# use 'Discretization.getIndex(states,dimension.stateVal)' instead.
-def read_index_for_state(states, dimension, stateVal):
-    print("deprecated warning: use 'Discretization.getIndex(states,dimension.stateVal)' instead.")
-    return Discretization.getIndex(states, dimension, stateVal)
-
-
-
 # expands the interval for the angles in s' when they loop around
 def expand_angles(samples):
     for sample in samples:
@@ -251,118 +243,6 @@ def getNextState(state, act, theta, fparams, states):
     return Discretization.getState(np.array(newState), states)
 
 
-# Planes the optimal policy for a MDP defined by:
-# states:   3xNo(DiscSteps) array containing cos(th), sin(th), dot(th)
-# action:   1xNo(DiscSteps) array containing the torque
-# theta:    1xNo(Features) array containing the coefficients for the fourier-approximation
-# fparams:  misc parameters for evaluation of fourier approximation
-def train_policy(states, actions, theta, fparams):
-    # Setup value-function
-    # length = No(all possible states)
-    print('Begin training policy')
-    explicitStatesShape = ()
-    for dim in range(states.shape[0]):
-        explicitStatesShape += (states.shape[1],)
-    valFun = np.zeros(explicitStatesShape)
-
-    # Contains amount of torque
-    # if t == np.inf torque is random
-    policy = np.full(explicitStatesShape, np.inf)
-
-    # iterate
-    oldPolicy = np.full(explicitStatesShape, np.inf)
-    valFun = np.zeros(explicitStatesShape)
-    updates = 0
-    # polTorque = 0
-    gamma = 0.9
-    transFun = np.zeros(explicitStatesShape + (states.shape[0],))
-    imReward = np.zeros(explicitStatesShape)
-    policyStable = False
-    # while udates < 10:
-    while not policyStable:
-        print("update:" + str(updates))
-        policyStable = True
-        oldPolicy = policy
-        # policy evaluation
-        maxDelta = 1
-
-        it = np.nditer(valFun, flags=['multi_index'])
-        tempReward = 0
-        tempState = ()
-        mulInd = 0
-        while not it.finished:
-            tempReward = 0
-            tempState = ()
-            mulInd = it.multi_index
-            for dim in range(len(mulInd)):
-                tempState += (states[dim][mulInd[dim]],)
-
-            if np.isinf(policy.item(mulInd)):
-                for act in range(len(actions[0])):
-                    tempReward += getReward(tempState, actions[0][act], theta, fparams) / len(actions[0])
-                imReward[mulInd] = tempReward
-                # TODO: Is that the right way to start out?
-                transFun[mulInd] = getNextState(tempState, np.random.choice(actions[0]), theta, fparams, states)
-            else:
-                imReward[mulInd] = getReward(tempState, policy.item(mulInd), theta, fparams)
-                transFun[mulInd] = getNextState(tempState, policy.item(mulInd), theta, fparams, states)
-            it.iternext()
-
-        while maxDelta > 0.01:
-            maxDelta = 0
-            it = np.nditer(valFun, flags=['multi_index'])
-            mulInd = 0
-            tempStateInd = ()
-            while not it.finished:
-                mulInd = it.multi_index
-                for dim in range(len(mulInd)):
-                    tempStateInd += (Discretization.getIndex(states, dim, transFun.item(mulInd + (dim,))),)
-
-                newValfun = imReward.item(mulInd) + gamma * valFun.item(tempStateInd)
-                maxDelta = max(maxDelta, np.abs(newValfun - valFun.item(mulInd)))
-                valFun[mulInd] = newValfun
-
-                tempStateInd = ()
-                it.iternext()
-
-        it = np.nditer(valFun, flags=['multi_index'])
-        bestTorque = 0
-        tempReward = -np.inf
-        bestReward = -np.inf
-        prevState = ()
-        nextState = ()
-        nextStateInd = ()
-        mulInd = 0
-        while not it.finished:
-            mulInd = it.multi_index
-            for dim in range(len(mulInd)):
-                prevState += (states[dim][mulInd[dim]],)
-            for act in actions[0]:
-                nextState = getNextState(prevState, act, theta, fparams, states)
-                for dim in range(len(mulInd)):
-                    nextStateInd += (Discretization.getIndex(states, dim, nextState[dim]),)
-                tempReward = getReward(prevState, act, theta, fparams) + gamma * valFun[nextStateInd]
-                if tempReward > bestReward:
-                    bestTorque = act
-                    bestReward = tempReward
-                tempReward = -np.inf
-                nextState = ()
-                nextStateInd = ()
-            stable = (policy[mulInd] == bestTorque)
-            if not stable:
-                policyStable = False
-            policy[mulInd] = bestTorque
-            bestReward = -np.inf
-            bestTorque = 0
-            prevState = ()
-            it.iternext()
-
-        updates += 1
-
-    print("updates: " + str(updates))
-    # return optimal policy lookup-table
-    return policy
-
 
 def new_train_policy(model, states, actions ):
     """
@@ -421,13 +301,13 @@ def new_train_policy(model, states, actions ):
                 #for act in range(len(actions[0])):
                 #    tempReward += model(tempState, actions[0][act])[1] / len(actions[0])
                 #imReward[mulInd] = tempReward
-                # TODO: Is that the right way to start out?
                 transFun[mulInd] = modelresult[0]
                 imReward[mulInd] = modelresult[1]
             else:
                 modelresult = model(tempState, policy.item(mulInd))
                 transFun[mulInd] = modelresult[0]
                 imReward[mulInd] = modelresult[1]
+            # print(mulInd)
             it.iternext()
         print("policy evaluation")
         while maxDelta > 0.1:
@@ -437,8 +317,7 @@ def new_train_policy(model, states, actions ):
             tempStateInd = ()
             while not it.finished:
                 mulInd = it.multi_index
-                for dim in range(len(mulInd)):
-                    tempStateInd += (Discretization.getIndex(states, dim, transFun.item(mulInd + (dim,))),)
+                tempStateInd = Discretization.getIndex(tempState, states)
 
                 newValfun = imReward.item(mulInd) + gamma * valFun.item(tempStateInd)
                 maxDelta = max(maxDelta, np.abs(newValfun - valFun.item(mulInd)))
@@ -462,8 +341,7 @@ def new_train_policy(model, states, actions ):
                 prevState += (states[dim][mulInd[dim]],)
             for act in actions[0]:
                 nextState = model(prevState, act)[0]
-                for dim in range(len(mulInd)):
-                    nextStateInd += (Discretization.getIndex(states, dim, nextState[dim]),)
+                nextStateInd = Discretization.getIndex(nextState, states)
                 tempReward = model(prevState, act)[1] + gamma * valFun[nextStateInd]
                 if tempReward > bestReward:
                     bestTorque = act
@@ -566,8 +444,11 @@ def main():
             # print("iteration:"+str(i))
             dis_obs = Discretization.getState(obs, discStates)
             index = []
+            """
+            !!! Deprecated !!!
             index += [Discretization.getIndex(discStates, 0, dis_obs[0])]
             index += [Discretization.getIndex(discStates, 1, dis_obs[1])]
+            """
             # act=policy[index[0]][index[1]][index[2]]
             act = policy[tuple(index)]
             obs, rew, done, _ = env.step([act])

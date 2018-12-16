@@ -55,7 +55,14 @@ class Discretization:
     def getState(sample, space):
         return Discretization._discretize(sample, space)[0]
 
+
     def _discretize(sample, space):
+        """
+
+        :param sample: the continous values for the sample-dimensions (e.g. dimensions of obs)
+        :param space: the discret space
+        :return: ((values in each dimension),(index in each dimension))
+        """
         discSample = []
         positions = []
         angle = False
@@ -111,16 +118,8 @@ class Discretization:
     # dimension:    state dimension in which the value is to be found
     # stateVal:     the Value for which to find the index
     # formerly read_index_for_state
-    def getIndex(states, dimension, stateVal):
-        # import pdb; pdb.set_trace()
-        # TODO @Tim unser Code soll schoener werden
-        if (dimension == 1):
-            return Discretization._discretize([0, stateVal], states)[1][dimension]
-        if (dimension == 2):
-            return Discretization._discretize([0, 0, stateVal], states)[1][dimension]
-        if (dimension == 3):
-            return Discretization._discretize([0, 0, 0, stateVal], states)[1][dimension]
-        return Discretization._discretize([stateVal], states)[1][dimension]
+    def getIndex(sample, space):
+        return tuple(Discretization._discretize(sample, space)[1])
         # dimLen = len(states[dimension])
         # dimMax = states[dimension][-1]
         # dimMin = states[dimension][0]
