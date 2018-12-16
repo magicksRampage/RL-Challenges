@@ -26,7 +26,7 @@ def get_model(env, max_num_samples):
     """
 
     numActions = 3
-    numStates = 13
+    numStates = 11
     discActions = Discretization.getSpace_extended(env.action_space, numActions, 3)
     discStates = Discretization.getSpace_extended(env.observation_space, numStates, 2)
     samples = explore(env, max_num_samples, discActions, discStates)
@@ -54,11 +54,11 @@ def get_policy(model, observation_space, action_space):
     :return: function pi: s -> a
     """
     numActions = 3
-    numStates = 13
+    numStates = 11
     discActions = Discretization.getSpace_extended(action_space, numActions, 3)
     discStates = Discretization.getSpace_extended(observation_space, numStates, 2)
 
-    policy = new_train_policy(model, discStates, discStates)
+    policy = new_train_policy(model, discStates, discActions)
 
     def return_fun(obs):
         mulInd = Discretization.getIndex(obs, discStates)

@@ -277,6 +277,8 @@ def new_train_policy(model, states, actions ):
     imReward = np.zeros(explicitStatesShape)
     policyStable = False
     # while udates < 10:
+    unstableCounter = 0
+    oldUnstableCounter = 0
     while not policyStable:
         print("update:" + str(updates))
         policyStable = True
@@ -298,11 +300,11 @@ def new_train_policy(model, states, actions ):
 
             if np.isinf(policy.item(mulInd)):
                 modelresult = model(tempState, np.random.choice(actions[0]))
-                #for act in range(len(actions[0])):
-                #    tempReward += model(tempState, actions[0][act])[1] / len(actions[0])
-                #imReward[mulInd] = tempReward
+                for act in range(len(actions[0])):
+                    tempReward += model(tempState, actions[0][act])[1] / len(actions[0])
+                imReward[mulInd] = tempReward
                 transFun[mulInd] = modelresult[0]
-                imReward[mulInd] = modelresult[1]
+                # imReward[mulInd] = modelresult[1]
             else:
                 modelresult = model(tempState, policy.item(mulInd))
                 transFun[mulInd] = modelresult[0]
@@ -334,6 +336,7 @@ def new_train_policy(model, states, actions ):
         nextState = ()
         nextStateInd = ()
         mulInd = 0
+        unstableCounter = 0
         print("policy improvement")
         while not it.finished:
             mulInd = it.multi_index
@@ -343,6 +346,8 @@ def new_train_policy(model, states, actions ):
                 nextState = model(prevState, act)[0]
                 nextStateInd = Discretization.getIndex(nextState, states)
                 tempReward = model(prevState, act)[1] + gamma * valFun[nextStateInd]
+                # if abs(tempReward - bestReward) < 0.001:
+                #     print(tempReward - bestReward)
                 if tempReward > bestReward:
                     bestTorque = act
                     bestReward = tempReward
@@ -351,14 +356,23 @@ def new_train_policy(model, states, actions ):
                 nextStateInd = ()
             stable = (policy[mulInd] == bestTorque)
             if not stable:
-                policyStable = False
+                print(mulInd)
+                unstableCounter += 1
+                # Is now handled by the unstableCounter
+                # policyStable = False
             policy[mulInd] = bestTorque
             bestReward = -np.inf
             bestTorque = 0
             prevState = ()
+            # print(mulInd)
             it.iternext()
-
+        if (unstableCounter == oldUnstableCounter):
+            policyStable = True
         updates += 1
+        oldUnstableCounter = unstableCounter
+        unstableCounter = 0
+        print("unstable: " + str(unstableCounter))
+
 
     print("updates: " + str(updates))
     # return optimal policy lookup-table
