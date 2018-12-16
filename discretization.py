@@ -64,25 +64,46 @@ class Discretization:
             #    angle = True
             #else:
             angle = False
+            high = len(space[i]) -1
+            low = 0
             if angle:
                 entry = Discretization._castAngle(sample[i], space[i][0], space[i][-1])
             else:
                 entry = np.clip(sample[i], space[i][0], space[i][-1])
-            for j in range(len(space[i])):
-                step = space[i][j]
-                if entry == step:
-                    discSample.append(step)
-                    positions.append(j)
-                    break
-                elif entry < step:
-                    prev = space[i][j - 1]
-                    if np.abs(entry - prev) > np.abs(entry - step):
-                        discSample.append(step)
-                        positions.append(j)
-                    else:
-                        discSample.append(prev)
-                        positions.append(j - 1)
-                    break
+                    
+
+            while high - low > 1:
+                mid = int(np.ceil((high - low) / 2) + low)
+                #print(str(high) + "," +  str(low)+ "," + str(mid))
+                if entry < space[i][mid]:
+                    high = mid
+                else:
+                    low = mid
+            highval = space[i][high]
+            lowval = space[i][low]
+            if np.abs(entry - lowval) > np.abs(entry - highval):
+                discSample.append(highval)
+                positions.append(high)
+            else:
+                discSample.append(lowval)
+                positions.append(low)
+
+            #for j in range(len(space[i])):
+            #  step = space[i][j]
+            #    if entry == step:
+            #        discSample.append(step)
+            #        positions.append(j)
+            #        break
+            #    elif entry < step:
+            #        prev = space[i][j - 1]
+            #        if np.abs(entry - prev) > np.abs(entry - step):
+            #            discSample.append(step)
+            #            positions.append(j)
+            #        else:
+            #            discSample.append(prev)
+            #            positions.append(j - 1)
+            #        break
+
         return [np.array(discSample), np.array(positions)]
 
     # Finds the index of a given stateValue in its discretized Space

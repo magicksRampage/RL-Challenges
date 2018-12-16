@@ -408,6 +408,7 @@ def new_train_policy(model, states, actions ):
         tempReward = 0
         tempState = ()
         mulInd = 0
+        print("precomputing model")
         while not it.finished:
             tempReward = 0
             tempState = ()
@@ -416,17 +417,20 @@ def new_train_policy(model, states, actions ):
                 tempState += (states[dim][mulInd[dim]],)
 
             if np.isinf(policy.item(mulInd)):
-                for act in range(len(actions[0])):
-                    tempReward += model(tempState, actions[0][act])[1] / len(actions[0])
-                imReward[mulInd] = tempReward
+                modelresult = model(tempState, np.random.choice(actions[0]))
+                #for act in range(len(actions[0])):
+                #    tempReward += model(tempState, actions[0][act])[1] / len(actions[0])
+                #imReward[mulInd] = tempReward
                 # TODO: Is that the right way to start out?
-                transFun[mulInd] = model(tempState, np.random.choice(actions[0]))[0]
+                transFun[mulInd] = modelresult[0]
+                imReward[mulInd] = modelresult[1]
             else:
-                imReward[mulInd] = model(tempState, policy.item(mulInd))[1]
-                transFun[mulInd] = model(tempState, policy.item(mulInd))[0]
+                modelresult = model(tempState, policy.item(mulInd))
+                transFun[mulInd] = modelresult[0]
+                imReward[mulInd] = modelresult[1]
             it.iternext()
-
-        while maxDelta > 0.01:
+        print("policy evaluation")
+        while maxDelta > 0.1:
             maxDelta = 0
             it = np.nditer(valFun, flags=['multi_index'])
             mulInd = 0
@@ -451,6 +455,7 @@ def new_train_policy(model, states, actions ):
         nextState = ()
         nextStateInd = ()
         mulInd = 0
+        print("policy improvement")
         while not it.finished:
             mulInd = it.multi_index
             for dim in range(len(mulInd)):

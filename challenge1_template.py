@@ -25,14 +25,14 @@ def get_model(env, max_num_samples):
     :return: function f: s, a -> s', r
     """
 
-    numActions = 5
-    numStates = 25
+    numActions = 3
+    numStates = 51
     discActions = Discretization.getSpace_extended(env.action_space, numActions, 3)
     discStates = Discretization.getSpace_extended(env.observation_space, numStates, 2)
     samples = explore(env, max_num_samples, discActions, discStates)
     numobs = len(samples[0][0])
     numact = len(samples[0][1])
-    numfeat = 20
+    numfeat = 50
     P = getP(numfeat, numobs + numact)
     v = 5
     phi = getphi(numfeat)
@@ -53,8 +53,8 @@ def get_policy(model, observation_space, action_space):
     :param action_space: gym.Space
     :return: function pi: s -> a
     """
-    numActions = 5
-    numStates = 25
+    numActions = 3
+    numStates = 51
     discActions = Discretization.getSpace_extended(action_space, numActions, 3)
     discStates = Discretization.getSpace_extended(observation_space, numStates, 2)
 
@@ -64,6 +64,6 @@ def get_policy(model, observation_space, action_space):
         mulInd = ()
         for dim in range(len(obs)):
             mulInd += (Discretization.getIndex(discStates, dim, obs[dim]),)
-        return policy(mulInd)
+        return policy[mulInd]
 
-    return lambda obs: return_fun(obs)
+    return lambda obs: [return_fun(obs)]
