@@ -7,90 +7,65 @@ from time import *
 from math import *
 from discretization import Discretization
 
-
-# dynamic programming algorithm
-# steps:
-# discretize state and action spaces (TODO: try better discretizations)
-# gather data for regression using exploration policy (TODO: try better exploration policies)
-# learn dynamics function
-# learn reward function
-# policy iteration / value iteration
-# TODO: plot results
-
-# returns a gym environment
-# whichEnv: Boolean --- qube for true, pendulum for false
 def makeEnv(whichEnv):
+    """
+    Used for personal testing. Chooses an environment
+
+    :param whichEnv: True for qube, false for pendulum
+    :return:
+    """
     if whichEnv:
         return gym.make('Qube-v0')
     else:
         return gym.make('Pendulum-v2')
 
 
-
-# 'discretize_space' deprecated.
-# use 'Discretization.getSpace' instead.
-def discretize_space(space, grain):
-    print("deprecated warning: use 'Discretization.getSpace' instead.")
-    return Discretization.getSpace(space, grain)
-
-
-# 'discretize_space_cube' deprecated.
-# use Discretization.getSpace_extended instead.
-def discretize_space_cube(space, grain, cubed):
-    print("deprecated warning: use Discretization.getSpace_extended instead.")
-    return Discretization.getSpace_extended(space, grain, cubed)
-
-
-# 'discretize_state(sample,space)' deprecated.
-# use 'Discretization.getState(sample,space)' instead.
-def discretize_state(sample,space):
-    print("deprecated warning: use 'Discretization.getState(sample,space)' instead.")
-    return Discretization.getState(sample, space)
-
-
-# expands the interval for the angles in s' when they loop around
 def expand_angles(samples):
+    """
+    Expands the interval for the angles in s' when they loop around
+
+    :param samples: observed state, action, observed reward, next observed state
+    :return: currated samples
+    """
     for sample in samples:
         curStateAngle = sample[0][0]
         newStateAngle = sample[3][0]
-        # print("old: " + str(curStateAngle) + ", new: " + str(newStateAngle))
         if np.abs(curStateAngle - newStateAngle) > 4:
             sample[3][0] = newStateAngle - (2 * np.pi * np.sign(newStateAngle))
 
 
-# gaussian exploration policy (for pendulum only)
-# obs:  current state
 def exploration_policy(obs,cube):
+    """
+    Gaussian exploration policy (for pendulum only)
+
+    :param obs: observed state
+    :param cube: whether the environment is the cube or pendulum
+    :return:
+    """
     if cube:
         zufall = rnd.gauss(0, 10)
         return zufall
     zufall = rnd.gauss(0, 1)
     value = zufall
     vel = obs[1]
-    # value=vel/8+zufall
     if (obs[0] > 1.57 or obs[0] < -1.57):
-        #    if(obs[0]<0.8):
         sig = copysign(1.5, vel)
-        # value=copysign(2,vel)#+rnd.gauss(0,0.5)
         value = rnd.gauss(sig, 0.5)
     else:
         value = rnd.gauss(0, 1)
-    # if (zufall<0):
-    #    value=-1
-    # else:
-    #    value=1
     return [min(2.0, max(-2.0, value))]
 
 
-# return [0]
-
-
-# generate a number of samples for regression, using an exploration policy
-# env:          learning environment
-# numSamples:   number of samples to be generated
-# actions:      discrete action space
-# states:       discrete state space
 def explore(env, numSamples, actions, states):
+    """
+    Generate a number of samples for regression, using an exploration policy
+
+    :param env: learning environment
+    :param numSamples: number of samples to be generated
+    :param actions: discrete action space
+    :param states: discrete state space
+    :return:
+    """
     print("start explore")
     samples = []
     renderCount = 15
@@ -121,19 +96,27 @@ def explore(env, numSamples, actions, states):
     return np.array(samples)
 
 
-# generates an array of random phase shifts for fourier features
-# numFeats:     number of fourier features
 def getphi(numFeats):
+    """
+    Generates an array of random phase shifts for fourier features
+
+    :param numFeats: number of Fourier features
+    :return:
+    """
     phi = []
     for i in range(numFeats):
         phi.append(rnd.random() * 2 * np.pi - np.pi)
     return np.array(phi)
 
 
-# generates a matrix of random weights for fourier features
-# NumFeats:             number of requested fourier features
-# sumNumStateActions:   sum of the number of States and number of Actions
 def getP(numFeats, sumNumStateActions):
+    """
+    Generates a matrix of random weights for fourier features
+
+    :param numFeats: number of requested fourier features
+    :param sumNumStateActions: sum of the number of States and number of Actions
+    :return:
+    """
     P = []
     for i in range(numFeats):
         Pi = []
@@ -143,13 +126,17 @@ def getP(numFeats, sumNumStateActions):
     return np.array(P)
 
 
-# computes the fourier features for a state observation
-# obs:      state observation
-# P:        weight matrix
-# v:        wavelength
-# phi:      phase shifts
-# numfeat:  number of fourier features to be generated
 def fourier(obs, P, v, phi, numFeats):
+    """
+    Computes the fourier features for a state observation
+
+    :param obs: observed state
+    :param P: weight matrix
+    :param v: wavelength
+    :param phi: phase shifts
+    :param numFeats: number of fourier features to be generated
+    :return:
+    """
     y = []
     for i in range(numFeats):
         arg = 0
@@ -161,12 +148,16 @@ def fourier(obs, P, v, phi, numFeats):
     return np.array(y)
 
 
-# computes the feature matrix for fourier regression
-# samples:          contains the samples from the regression
-#                       [[discState, action, reward, nextDiscState]]
-# numfeat:          number of fourier features to be generated
-# fourierparams:    contains P, v, phi and the desired number of fourier features
 def featuremat(samples, numFeats, fourierparams):
+    """
+    Computes the feature matrix for fourier regression
+
+    :param samples: contains the samples from the regression
+    [[discState, action, reward, nextDiscState]]
+    :param numFeats: number of fourier features to be generated
+    :param fourierparams: contains P, v, phi and the desired number of fourier features
+    :return:
+    """
     numobs = len(samples[0][0])
     numact = len(samples[0][1])
     numsamp = len(samples)
@@ -182,78 +173,76 @@ def featuremat(samples, numFeats, fourierparams):
     return mat
 
 
-# executes fourier regression for the given samples and returns theta
-# ---theta[0] contains the parameters for the reward function
-# ---theta[1] contains the parameters for the dynamics function
-# samples:          contains the samples from the regression
-#                   ---[[discState, action, reward, nextDiscState]]
-# fourierparams:    contains P, v, phi and the desired number of fourier features
 def regression(samples, fourierparams):
+    """
+    Executes fourier regression for the given samples
+
+    :param samples: contains the samples from the regression
+    [[discState, action, reward, nextDiscState]]
+    :param fourierparams: contains P, v, phi and the desired number of fourier features
+    :return: theta
+    theta[0] contains the parameters for the reward function
+    theta[1] contains the parameters for the dynamics function
+    """
     print('Begin Regression')
     theta = []
     numfeat = fourierparams[3]
     features = featuremat(samples, numfeat, fourierparams)
-    # print(features)
     feat_inverse = np.linalg.pinv(features)
-    # print(feat_inverse)
     rewards = samples[..., 2]
-    # print(rewards)
     next_states = np.array(list(samples[..., 3]))
-    # print(next_states.shape)
     theta_r = np.dot(feat_inverse, rewards)
-    # print(theta_r.shape)
-    # print(theta_r)
     theta.append(theta_r)
     theta_dyn = np.dot(feat_inverse, next_states)
-    # print(theta_dyn.shape)
-    # print(theta_dyn)
     theta.append(theta_dyn)
     print('Regression Finished')
     return theta
 
 
-# calculates the immediate reward for a state-action pair
-# obs:      state observation
-# act:      action taken
-# theta:    coefficients for the fourier-approximation
-# fparams:  misc parameters for the fourier features
 def getReward(obs, act, theta, fparams):
+    """
+    Calculates the immediate reward for a state-action pair
+
+    :param obs: observed state
+    :param act: action taken
+    :param theta: coefficients for the fourier-approximation
+    :param fparams: misc parameters for the fourier features
+    :return:
+    """
     x = np.append(obs, act)
     fx = fourier(x, fparams[0], fparams[1], fparams[2], fparams[3])
     return np.dot(theta[0], fx)
 
 
-# calculates the projected next state for a state-action pair
-# state:    previous state tupel
-# act:      action taken
-# theta:    coefficients for the fourier-approximation
-#           ---theta[0] contains the parameters for the reward function
-#           ---theta[1] contains the parameters for the dynamics function
-# fparams:  misc parameters for the fourier features
-# states:   discretized space of states
 def getNextState(state, act, theta, fparams, states):
+    """
+    Calculates the projected next state for a state-action pair
+
+    :param state: previous state tupel
+    :param act: action taken
+    :param theta: coefficients for the fourier-approximation
+    :param fparams: misc parameters for the fourier features
+    :param states: discretized space of states
+    :return:
+    """
     x = np.append(state, act)
     fx = fourier(x, fparams[0], fparams[1], fparams[2], fparams[3])
     theta_s = theta[1]
-    # print(theta_s[...,0])
     newState = []
     for i in range(len(state)):
         newState.append(np.dot(theta_s[..., i], fx))
-    # print(newState)
     return Discretization.getState(np.array(newState), states)
 
 
-
-def new_train_policy(model, states, actions ):
+def train_policy(model, states, actions ):
     """
+    Trains a policy for the given model and spaces
 
     :param model: predicts the "consequences" of a given state-action-pair
     :param states: disc. space of states
     :param actions:  disc. space of actions
     :return: policy tensor containing the appropriate actions on the states indices
     """
-
-
 
     # Setup value-function
     # length = No(all possible states)
@@ -276,7 +265,6 @@ def new_train_policy(model, states, actions ):
     transFun = np.zeros(explicitStatesShape + (states.shape[0],))
     imReward = np.zeros(explicitStatesShape)
     policyStable = False
-    # while udates < 10:
     unstableCounter = 0
     oldUnstableCounter = 0
     while not policyStable:
@@ -304,12 +292,10 @@ def new_train_policy(model, states, actions ):
                     tempReward += model(tempState, actions[0][act])[1] / len(actions[0])
                 imReward[mulInd] = tempReward
                 transFun[mulInd] = modelresult[0]
-                # imReward[mulInd] = modelresult[1]
             else:
                 modelresult = model(tempState, policy.item(mulInd))
                 transFun[mulInd] = modelresult[0]
                 imReward[mulInd] = modelresult[1]
-            # print(mulInd)
             it.iternext()
         print("policy evaluation")
         while maxDelta > 0.1:
@@ -346,8 +332,6 @@ def new_train_policy(model, states, actions ):
                 nextState = model(prevState, act)[0]
                 nextStateInd = Discretization.getIndex(nextState, states)
                 tempReward = model(prevState, act)[1] + gamma * valFun[nextStateInd]
-                # if abs(tempReward - bestReward) < 0.001:
-                #     print(tempReward - bestReward)
                 if tempReward > bestReward:
                     bestTorque = act
                     bestReward = tempReward
@@ -358,20 +342,17 @@ def new_train_policy(model, states, actions ):
             if not stable:
                 print(mulInd)
                 unstableCounter += 1
-                # Is now handled by the unstableCounter
-                # policyStable = False
             policy[mulInd] = bestTorque
             bestReward = -np.inf
             bestTorque = 0
             prevState = ()
-            # print(mulInd)
             it.iternext()
-        if (unstableCounter == oldUnstableCounter):
-            policyStable = True
+        if not (unstableCounter >= oldUnstableCounter):
+            policyStable = False
         updates += 1
+        print("unstable: " + str(unstableCounter))
         oldUnstableCounter = unstableCounter
         unstableCounter = 0
-        print("unstable: " + str(unstableCounter))
 
 
     print("updates: " + str(updates))
@@ -379,8 +360,10 @@ def new_train_policy(model, states, actions ):
     return policy
 
 
-#samples:       [state, action, reward, next state]
 def main():
+    """
+    For personal testing
+    """
     t1 = clock()
     # false for pendulum, true for qube
     qube = False
@@ -389,16 +372,7 @@ def main():
     numStates = 51
     discActions = Discretization.getSpace_extended(env.action_space, numActions, 3)
     discStates = Discretization.getSpace_extended(env.observation_space, numStates, 2)
-    # discCube = Discretization.getSpace_extended(env.observation_space, numStates, [3, 3, 3, 3])
-    # Discretisation.plot(
-    #     [np.sin(discStates[0]), np.sin(discCube[0])],
-    #     [np.cos(discStates[0]), np.cos(discCube[0])], ['o', '.'])
-    # plt.show()
-    # print(discActions)
-    # print(discStates)
     samples = explore(env, 10000, discActions, discStates)
-    # print(len(samples))
-    # print(samples[0])
     numobs = len(samples[0][0])
     numact = len(samples[0][1])
     numfeat = 50
@@ -415,9 +389,6 @@ def main():
     for i in range(len(samples)):
         # angle
         x[0][i] = samples[i][0][0]
-        # if np.abs(x[0][i]) > 4:
-        #     print(x[0][i])
-        # angular velocity
         x[1][i] = samples[i][0][1]
         # true next angle
         x[2][i] = samples[i][3][0]
@@ -432,20 +403,11 @@ def main():
     #plt.scatter(x[0], yp[1])
     plt.scatter(x[0], x[3])
     #plt.show()
-
-    # test1 = getReward(samples[0][0], samples[0][1], theta, fourierparams)
-    # test2 = getNextState(samples[0][0], samples[0][1], theta, fourierparams, discStates)
-    # print(test1)
-    # print(test2)
-    # Planning via dynamic programming
     policy = train_policy(discStates, discActions, theta, fourierparams)
 
     print('Its over')
     t2 = clock()
     print("Rechenzeit = " + str(t2 - t1))
-    # print(policy)
-    # policy_iterator = policy.reshape(1,numStates * numStates * numStates)
-    # plt.scatter(range(numStates * numStates * numStates), policy_iterator[0])
     validation = []
     fig,ax=plt.subplots()
     plt.show()#stop zum anschauen
@@ -455,15 +417,8 @@ def main():
         done = False
         while not done:
             sample = [obs]
-            # print("iteration:"+str(i))
             dis_obs = Discretization.getState(obs, discStates)
             index = []
-            """
-            !!! Deprecated !!!
-            index += [Discretization.getIndex(discStates, 0, dis_obs[0])]
-            index += [Discretization.getIndex(discStates, 1, dis_obs[1])]
-            """
-            # act=policy[index[0]][index[1]][index[2]]
             act = policy[tuple(index)]
             obs, rew, done, _ = env.step([act])
             sample.append([act])
@@ -473,7 +428,6 @@ def main():
             sample.append(getNextState(sample[0], act, theta, fourierparams, discStates))
             validation.append(sample)
             reward += rew
-            # print(""+str(i)+" : "+str(rew)+" -- "+str(obs[0])+" "+str(obs[1]))
             env.render()
         print(reward)
 
@@ -486,9 +440,3 @@ def main():
         yp[i] = np.square(validation[i][2] - validation[i][4])
     plt.scatter(x[0], yp)
     plt.show()
-
-
-
-
-# For automatic execution
-#main()

@@ -4,11 +4,14 @@ import numpy as np
 
 class Discretization:
 
-    # returns a uniform discrete space
-    # space:    continuous space to be discretized
-    # grain:    number of desired discrete classes for each dimension of the space
-    # formerly 'discretize_space'
     def getSpace(space, grain):
+        """
+        Returns a uniform discrete space
+
+        :param space: continuous space to be discretized
+        :param grain: number of desired discrete classes for each dimension of the space
+        :return:
+        """
         shape = space.shape
         highs = space.high
         lows = space.low
@@ -19,12 +22,15 @@ class Discretization:
                 discSpace[i][j] = lows[i] + j * step
         return discSpace
 
-    # returns a uniform discrete space
-    # space:    continuous space to be discretized
-    # grain:    number of desired discrete classes for each dimension of the space
-    # exponent: [0,1,sonstiges]=linear;  2=squared;  3=cubed
-    # formerly 'discretize_space_cube'
     def getSpace_extended(space, grain, exponent):
+        """
+        Returns a uniform discrete space
+
+        :param space: continuous space to be discretized
+        :param grain: number of desired discrete classes for each dimension of the space
+        :param exponent: [0,1,sonstiges]=linear;  2=squared;  3=cubed
+        :return:
+        """
         shape = space.shape
         highs = space.high
         lows = space.low
@@ -47,14 +53,15 @@ class Discretization:
 
         return discSpace
 
-
-    # classifies a continuous sample for a discrete space
-    # sample:   continuous sample to be discretized
-    # space:    discrete space
-    # formerly 'discretize_state'
     def getState(sample, space):
-        return Discretization._discretize(sample, space)[0]
+        """
+        Classifies a continuous sample for a discrete space
 
+        :param sample: continuous sample to be discretized
+        :param space: discrete space
+        :return:
+        """
+        return Discretization._discretize(sample, space)[0]
 
     def _discretize(sample, space):
         """
@@ -67,9 +74,6 @@ class Discretization:
         positions = []
         angle = False
         for i in range(len(sample)):
-            #if len(sample) > 1 and i == 0:
-            #    angle = True
-            #else:
             angle = False
             high = len(space[i]) -1
             low = 0
@@ -81,7 +85,6 @@ class Discretization:
 
             while high - low > 1:
                 mid = int(np.ceil((high - low) / 2) + low)
-                #print(str(high) + "," +  str(low)+ "," + str(mid))
                 if entry < space[i][mid]:
                     high = mid
                 else:
@@ -94,41 +97,26 @@ class Discretization:
             else:
                 discSample.append(lowval)
                 positions.append(low)
-
-            #for j in range(len(space[i])):
-            #  step = space[i][j]
-            #    if entry == step:
-            #        discSample.append(step)
-            #        positions.append(j)
-            #        break
-            #    elif entry < step:
-            #        prev = space[i][j - 1]
-            #        if np.abs(entry - prev) > np.abs(entry - step):
-            #            discSample.append(step)
-            #            positions.append(j)
-            #        else:
-            #            discSample.append(prev)
-            #            positions.append(j - 1)
-            #        break
-
         return [np.array(discSample), np.array(positions)]
 
-    # Finds the index of a given stateValue in its discretized Space
-    # states:       discretized state space
-    # dimension:    state dimension in which the value is to be found
-    # stateVal:     the Value for which to find the index
-    # formerly read_index_for_state
     def getIndex(sample, space):
-        return tuple(Discretization._discretize(sample, space)[1])
-        # dimLen = len(states[dimension])
-        # dimMax = states[dimension][-1]
-        # dimMin = states[dimension][0]
-        # step = (dimMax - dimMin) / (dimLen - 1)
-        # index = (stateVal - dimMin) / step
-        # return int(round(max(dimMin, min(dimMax, index))))
+        """
+        Finds Index for a sample
 
-    # loops input sample into the interval defined by low and high
+        :param sample: observations sample
+        :param space: discrete space
+        :return: multiIndex
+        """
+        return tuple(Discretization._discretize(sample, space)[1])
+
     def _castAngle(sample, low, high):
+        """
+        Loops input sample into the interval defined by low and high
+
+        :param low: lowest value of the angle Space
+        :param high: highest value of the angle Space
+        :return:
+        """
         distance = high - low
         while sample < low:
             sample += distance
@@ -137,6 +125,12 @@ class Discretization:
         return sample
 
     def plot(x, y, opt):
+        """
+
+        :param y:
+        :param opt:
+        :return:
+        """
         l = len(x)
         if len(y) < l:
             l = len(y)

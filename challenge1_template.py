@@ -7,12 +7,9 @@ Submission template for Programming Challenge 1: Dynamic Programming.
 """
 
 info = dict(
-    group_number=None,  # change if you are an existing seminar/project group
-    authors="John Doe; Lorem Ipsum; Foo Bar",
-    description="Explain what your code does and how. "
-                "Keep this description short "
-                "as it is not meant to be a replacement for docstrings "
-                "but rather a quick summary to help the grader.")
+    group_number=23,  # change if you are an existing seminar/project group
+    authors="Marc-André Reichelt; Tim Unverzagt; Lennart Ebeling",
+    description="Left out due to shortage of time.")
 
 
 def get_model(env, max_num_samples):
@@ -26,7 +23,7 @@ def get_model(env, max_num_samples):
     """
 
     numActions = 3
-    numStates = 11
+    numStates = 19
     discActions = Discretization.getSpace_extended(env.action_space, numActions, 3)
     discStates = Discretization.getSpace_extended(env.observation_space, numStates, 2)
     samples = explore(env, max_num_samples, discActions, discStates)
@@ -54,11 +51,11 @@ def get_policy(model, observation_space, action_space):
     :return: function pi: s -> a
     """
     numActions = 3
-    numStates = 11
+    numStates = 19
     discActions = Discretization.getSpace_extended(action_space, numActions, 3)
     discStates = Discretization.getSpace_extended(observation_space, numStates, 2)
 
-    policy = new_train_policy(model, discStates, discActions)
+    policy = train_policy(model, discStates, discActions)
 
     def return_fun(obs):
         mulInd = Discretization.getIndex(obs, discStates)
